@@ -1,0 +1,12 @@
+[submodule "mainui"]
+	path = mainui
+	url = https://github.com/Crow-bar/mainui_cpp
+[submodule "ref_gl/nanogl"]
+	path = ref_gl/nanogl
+	url = https://github.com/FWGS/nanogl
+[submodule "ref_gl/gl-wes-v2"]
+	path = ref_gl/gl-wes-v2
+	url = https://github.com/FWGS/gl-wes-v2
+[submodule "vgui-dev"]
+	path = vgui-dev
+	url = https://github.com/FWGS/vgui-dev

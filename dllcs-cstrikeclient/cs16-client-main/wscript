@@ -1,0 +1,225 @@
+#! /usr/bin/env python
+# encoding: utf-8
+# Counter-Strike 1.6 client (cs16-client) as a static, relocatable game library.
+# On PSP there is no usable dynamic loader, so the client is linked into the
+# engine binary and looked up through the exports table (see scripts/waifulib/xshlib.py).
+
+from waflib import Logs, Configure
+import os
+import re
+
+top = '.'
+
+CLIENT_EXCLUDE = [
+	# Windows DirectInput path, replaced by input/input_xash3d.cpp
+	'cl_dll/inputw32.cpp',
+	# replaced by input/input_sdl.cpp, which is what this build selects
+	'cl_dll/ev_hldm.cpp',
+	'cl_dll/input/input_sdl.cpp',
+	# defines duplicated globals, the real definitions live in cs_weapons.cpp
+	'cl_dll/cs_wpn/cs_baseentity.cpp',
+]
+
+MINIUTL_EXCLUDE = []
+
+INCLUDES = [
+	'cl_dll/include',
+	'cl_dll/include/hud',
+	'cl_dll/include/studio',
+	'cl_dll/include/math',
+	'cl_dll',
+	'cl_dll/particleman',
+	'common',
+	'engine',
+	'pm_shared',
+	'dlls',
+	'game_shared',
+	'public',
+	'public/cl_dll',
+	'3rdparty/miniutl',
+	'3rdparty/mainui_cpp',
+	'3rdparty/mainui_cpp/miniutl',
+]
+
+DEFINES = [
+	'CLIENT_WEAPONS',
+	'CLIENT_DLL',
+	'STDINT_H=<cstdint>',
+	# MSVC spellings, mapped onto newlib
+	'stricmp=strcasecmp',
+	'strnicmp=strncasecmp',
+	'_strnicmp=strncasecmp',
+]
+
+
+def options(opt):
+	grp = opt.add_option_group('CS16 client options')
+
+	grp.add_option('--enable-cs16-client', action='store_true', dest='CS16_CLIENT',
+		default=False, help='build the Counter-Strike client library')
+
+
+def configure(conf):
+	if conf.env.DEST_OS != 'psp':
+		conf.fatal('the cs16 client is only wired up for PSP at the moment')
+
+	# The engine puts the build directory on the include path. That makes
+	# cl_dll.h pick up ../../engine/cdll_int.h from xash3d instead of the copy
+	# shipped with this project, so drop it here: every header this client
+	# needs is reachable through INCLUDES below.
+	drop = ('-I.', '-I' + str(conf.bldnode.abspath()))
+	conf.env.CXXFLAGS = [f for f in conf.env.CXXFLAGS if f not in drop]
+
+	conf.env.append_unique('CXXFLAGS', ['-fno-rtti'])
+
+	# Upstream sources trip over the engine's stricter warning set
+	conf.env.append_unique('CXXFLAGS', ['-Wno-parentheses', '-Wno-unused-value', '-Wno-implicit-fallthrough'])
+
+	# ReGameDLL needs C++14 (decltype(auto) in dlls/vector.h). waf uses the
+	# per-feature variable for shlib targets, so both have to be updated.
+	conf.env.append_unique('CXXFLAGS', ['-std=gnu++14'])
+	conf.env.append_unique('CXXFLAGS_CXXSHLIB', ['-std=gnu++14'])
+	conf.env.append_unique('CXXFLAGS_CXXSHLIB', ['-Wno-parentheses', '-Wno-unused-value', '-Wno-implicit-fallthrough'])
+
+
+def _sources(bld):
+	patterns = [
+		'cl_dll/*.cpp',
+		'cl_dll/events/*.cpp',
+		'cl_dll/cs_wpn/*.cpp',
+		'cl_dll/hud/*.cpp',
+		'cl_dll/input/*.cpp',
+		'cl_dll/particleman/*.cpp',
+		'dlls/wpn_shared/*.cpp',
+		'game_shared/*.cpp',
+		'pm_shared/*.cpp',
+		'3rdparty/miniutl/*.cpp',
+		'common/*.cpp',
+		'public/*.cpp',
+	]
+
+	source = bld.path.ant_glob(patterns, excl=CLIENT_EXCLUDE + MINIUTL_EXCLUDE)
+	return source
+
+
+# Counter-Strike game library (ReGameDLL_CS). Same story as the client: no
+# dynamic loader on PSP, so it goes in statically too.
+REGAMEDLL = '3rdparty/ReGameDLL_CS/regamedll'
+
+# public/FileSystem.cpp pulls filesystem_stdio in with dlopen, which does not
+# exist here. FileSystem_psp.cpp forwards to the engine filesystem instead.
+SERVER_EXCLUDE = [
+	'public/FileSystem.cpp',
+	# dead code upstream: not in its CMake source list and nothing includes
+	# public/utlsymbol.h, so it cannot compile on its own
+	'public/utlsymbol.cpp',
+	# win32 only, assert_dialog.cpp needs windows resources
+	'public/tier0/platform_win32.cpp',
+	'public/tier0/assert_dialog.cpp',
+]
+
+SERVER_INCLUDES = [
+	REGAMEDLL,
+	REGAMEDLL + '/common',
+	REGAMEDLL + '/engine',
+	REGAMEDLL + '/game_shared',
+	REGAMEDLL + '/pm_shared',
+	REGAMEDLL + '/dlls',
+	REGAMEDLL + '/dlls/API',
+	REGAMEDLL + '/dlls/bot',
+	REGAMEDLL + '/dlls/bot/states',
+	REGAMEDLL + '/dlls/hostage/states',
+	REGAMEDLL + '/public',
+	REGAMEDLL + '/public/tier0',
+	REGAMEDLL + '/regamedll',
+	REGAMEDLL + '/public/regamedll',
+	'3rdparty/miniutl',
+]
+
+SERVER_DEFINES = [
+	'REGAMEDLL_API',
+	'REGAMEDLL_ADD',
+	'USE_QSTRING',
+	# all skins of a team share one player model, nine do not fit in memory
+	'PSP_ONE_SKIN_PER_TEAM',
+	# glibc/MSVC spellings newlib does not have
+	'_stricmp=strcasecmp',
+	'_strnicmp=strncasecmp',
+	'strdup=strdup',
+	'snprintf=snprintf',
+	'vsnprintf=vsnprintf',
+	'_vsnprintf=vsnprintf',
+]
+
+
+def _server_sources(bld):
+	patterns = [
+		'dlls/*.cpp',
+		'dlls/API/*.cpp',
+		'dlls/addons/*.cpp',
+		'dlls/bot/*.cpp',
+		'dlls/bot/states/*.cpp',
+		'dlls/hostage/*.cpp',
+		'dlls/hostage/states/*.cpp',
+		# every weapon_* entity lives here; without it the server has no weapons
+		'dlls/wpn_shared/*.cpp',
+		'common/*.cpp',
+		'engine/*.cpp',
+		'game_shared/*.cpp',
+		'game_shared/bot/*.cpp',
+		'pm_shared/*.cpp',
+		'public/*.cpp',
+		'public/tier0/*.cpp',
+		'regamedll/*.cpp',
+	]
+	# exclude paths are relative to the node ant_glob is called on
+	excl = [ REGAMEDLL + '/' + e for e in SERVER_EXCLUDE ]
+	return bld.path.ant_glob([ REGAMEDLL + '/' + p for p in patterns ], excl=excl)
+
+
+# DLL entry points the engine looks up by name
+SERVER_EXPORTS = [
+	'GetEntityAPI2',
+	'GetEntityAPI',
+	'GetNewDLLFunctions',
+	'GiveFnptrsToDll',
+	'Server_GetBlendingInterface',
+]
+
+def _write_server_exports(bld, sources):
+	"""
+	The engine also resolves every map entity ("worldspawn", "weapon_ak47",
+	...) by name, and LINK_ENTITY_TO_CLASS defines one C function per class.
+	Without them no entity spawns: worldspawn never installs the game rules
+	and ServerActivate() calls through a NULL g_pGameRules.
+	"""
+	ents = set()
+	for node in sources:
+		ents.update(re.findall(r'^\s*LINK_ENTITY_TO_CLASS\s*\(\s*(\w+)', node.read(), re.M))
+	bld.path.make_node('exports_server.txt').write('\n'.join(SERVER_EXPORTS + sorted(ents)) + '\n')
+
+
+def build(bld):
+	bld.shlib(
+		source   = _sources(bld),
+		target   = 'client',
+		features = 'cxx',
+		includes = INCLUDES,
+		defines  = DEFINES,
+		install_path = bld.env.LIBDIR,
+		subsystem = bld.env.MSVC_SUBSYSTEM
+	)
+
+	# ReGameDLL needs C++14, which configure() sets for this whole subproject
+	if os.path.isfile( os.path.join( bld.path.abspath(), REGAMEDLL, 'regamedll/regamedll.cpp' )):
+		server_sources = _server_sources(bld)
+		_write_server_exports(bld, server_sources)
+		bld.shlib(
+			source   = server_sources,
+			target   = 'server',
+			features = 'cxx',
+			includes = SERVER_INCLUDES,
+			defines  = SERVER_DEFINES,
+			install_path = bld.env.LIBDIR,
+			subsystem = bld.env.MSVC_SUBSYSTEM
+		)
