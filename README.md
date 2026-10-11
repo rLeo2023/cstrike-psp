@@ -77,7 +77,7 @@ Everything can be changed in `cstrike/userconfig.cfg`.
 - Some hint texts show up as untranslated keys (`Cstrike_TitlesTXT_...`).
 - Large maps may not fit in memory.
 - With 3 bots (2v2) memory is tight.
-
+- Sometimes it will not open on PSP, try to enable 'Force Extra Memory' in your CFW.
 ## Credits and licenses
 
 - Xash3D engine: Unkle Mike and the [FWGS](https://github.com/FWGS/xash3d-fwgs) team. PSP port: [Crow-bar](https://github.com/Crow-bar/xash3d-fwgs). See `README-xash3d.md`.
