@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "MessageBox.h"
 #include "Table.h"
 
+#ifndef MAINUI_PSP
+
 #define ART_BANNER		"gfx/shell/head_controls"
 #define MAX_KEYS 256
 
@@ -405,7 +407,11 @@ void CMenuControls::_Init( void )
 	AddItem( background );
 	AddItem( banner );
 	AddButton( L( "GameUI_UseDefaults" ), L( "GameUI_KeyboardSettingsText" ), PC_USE_DEFAULTS, msgBox2.MakeOpenEvent() );
+#ifdef MAINUI_PSP
+	AddButton( L( "Adv. Controls" ), L( "Look speed, analog stick, auto-aim and crosshair" ), PC_ADV_CONTROLS, UI_AdvControls_Menu );
+#else
 	AddButton( L( "Adv. Controls" ), L( "Change mouse sensitivity, enable autoaim, mouselook and crosshair" ), PC_ADV_CONTROLS, UI_AdvControls_Menu );
+#endif
 	AddButton( L( "GameUI_OK" ), L( "Save changed and return to configuration menu" ), PC_DONE,
 		VoidCb( &CMenuControls::SaveAndPopMenu ) );
 	AddButton( L( "GameUI_Cancel" ), L( "Discard changes and return to configuration menu" ), PC_CANCEL,
@@ -423,3 +429,14 @@ void CMenuControls::_VidInit()
 }
 
 ADD_MENU( menu_controls, CMenuControls, UI_Controls_Menu );
+
+#else // MAINUI_PSP
+
+// No key remapping screen on PSP: the buttons are fixed (userconfig.cfg) and
+// its key table alone took ~43KB. "Controls" opens the PSP settings instead
+void UI_Controls_Menu( void )
+{
+	UI_AdvControls_Menu();
+}
+
+#endif // MAINUI_PSP

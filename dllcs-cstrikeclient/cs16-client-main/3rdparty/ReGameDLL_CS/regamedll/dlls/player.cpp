@@ -9257,6 +9257,13 @@ float CBasePlayer::GetDyingAnimationDuration() const
 
 void CBasePlayer::SpawnClientSideCorpse()
 {
+#ifdef __PSP__
+	// no lasting corpses on PSP: the body plays its death animation and is
+	// gone when the player turns observer (~3 s), instead of a client copy
+	// that stays and is drawn for the rest of the round
+	return;
+#endif
+
 #ifdef REGAMEDLL_FIXES
 	// not allow to spawn, if the player was torn to gib
 	if (pev->effects & EF_NODRAW)

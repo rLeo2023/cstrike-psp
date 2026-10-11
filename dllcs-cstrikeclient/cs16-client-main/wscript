@@ -140,6 +140,11 @@ SERVER_DEFINES = [
 	'REGAMEDLL_API',
 	'REGAMEDLL_ADD',
 	'USE_QSTRING',
+	# weapon timers count down relative to now (UTIL_WeaponTimeBase() == 0),
+	# what the weapon code expects: without it DefaultReload stored "2.5 s"
+	# against the absolute clock and every magazine reload ended at once,
+	# cutting the animation (shotguns, written the other way, worked)
+	'CLIENT_WEAPONS',
 	# all skins of a team share one player model, nine do not fit in memory
 	'PSP_ONE_SKIN_PER_TEAM',
 	# glibc/MSVC spellings newlib does not have

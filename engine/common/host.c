@@ -606,7 +606,17 @@ qboolean Host_FilterTime( float time )
 		else
 		{
 			if(( host.realtime - oldtime ) < ( 1.0 / fps ))
-				return false;		
+			{
+#if XASH_PSP
+				// sleeptime is 0 here, so the frame cap used to busy-wait
+				// at full CPU: sleep through the rest of the frame instead,
+				// that is what saves battery. 1 ms early, the poll finishes
+				int msec = (int)(( 1.0 / fps - ( host.realtime - oldtime )) * 1000.0 ) - 1;
+				if( msec > 0 )
+					Sys_Sleep( msec );
+#endif
+				return false;
+			}
 		}
 	}
 

@@ -413,7 +413,15 @@ void SV_CreateBaseline( void )
 
 	if( FBitSet( host.features, ENGINE_QUAKE_COMPATIBLE ))
 		playermodel = SV_ModelIndex( DEFAULT_PLAYER_PATH_QUAKE );
+#if XASH_PSP
+	// SV_ModelIndex registers the name when missing and the client then
+	// loads it: models/player.mdl is 2MB and the PSP game library never
+	// uses it (PLAYER_BASE_MODEL). Any model the players use does here, the
+	// baseline only saves sending the index
+	else playermodel = SV_ModelIndex( "models/player/gign/gign.mdl" );
+#else
 	else playermodel = SV_ModelIndex( DEFAULT_PLAYER_PATH_HALFLIFE );
+#endif
 
 	memset( &nullstate, 0, sizeof( nullstate ));
 

@@ -140,7 +140,7 @@ void CMenuEditable::DiscardChanges()
 void CMenuEditable::WriteCvar()
 {
 	if( onCvarWrite ) onCvarWrite( this );
-	else
+	else if( m_szCvarName ) // controls without a cvar (radio buttons) just keep the value
 	{
 		switch( m_eType )
 		{

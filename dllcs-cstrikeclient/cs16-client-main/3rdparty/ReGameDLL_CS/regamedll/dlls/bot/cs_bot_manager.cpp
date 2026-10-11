@@ -247,6 +247,8 @@ void CCSBotManager::ServerActivate()
 	// has registered the cvar and is lost. The menu keeps the bot slider in
 	// its own engine cvar, take the count from there on every map start.
 	CVAR_SET_FLOAT("bot_quota", CVAR_GET_FLOAT("cs_menu_botcount"));
+	// same for the Easy / Medium choice (0 easy, 1 normal)
+	CVAR_SET_FLOAT("bot_difficulty", CVAR_GET_FLOAT("cs_menu_botdiff"));
 
 	// The nav mesh takes megabytes the PSP has no room for in a game without
 	// bots. BotAddCommand loads it when the first bot joins.

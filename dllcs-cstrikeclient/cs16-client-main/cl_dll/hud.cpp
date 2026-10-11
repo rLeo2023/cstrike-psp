@@ -453,6 +453,17 @@ CHud :: ~CHud()
 	m_pHudList = NULL;
 }
 
+// HUD sprites the PSP build never draws (the radar is hidden, see
+// CHudRadar::Draw), skipped so they don't take memory
+static bool PSP_SkipHudSprite( const char *sprite )
+{
+#ifdef __PSP__
+	return !strncmp( sprite, "radar", 5 );
+#else
+	return false;
+#endif
+}
+
 void CHud :: VidInit( void )
 {
 	static bool firstinit = true;
@@ -510,7 +521,7 @@ void CHud :: VidInit( void )
 				{
 					char sz[256];
 					sprintf(sz, "sprites/%s.spr", p->szSprite);
-					m_rghSprites[index] = SPR_Load(sz);
+					m_rghSprites[index] = PSP_SkipHudSprite( p->szSprite ) ? 0 : SPR_Load(sz);
 					m_rgrcRects[index] = p->rc;
 					strncpy( &m_rgszSpriteNames[index * MAX_SPRITE_NAME_LENGTH], p->szName, MAX_SPRITE_NAME_LENGTH );
 
@@ -533,7 +544,7 @@ void CHud :: VidInit( void )
 			{
 				char sz[256];
 				sprintf( sz, "sprites/%s.spr", p->szSprite );
-				m_rghSprites[index] = SPR_Load(sz);
+				m_rghSprites[index] = PSP_SkipHudSprite( p->szSprite ) ? 0 : SPR_Load(sz);
 				index++;
 			}
 

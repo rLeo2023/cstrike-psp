@@ -84,6 +84,11 @@ int CHudFlashlight:: MsgFunc_Flashlight(const char *pszName,  int iSize, void *p
 
 int CHudFlashlight::Draw(float flTime)
 {
+#ifdef __PSP__
+	// no flashlight key on the PSP, the icon only flashed up on its own
+	return 1;
+#endif
+
 	if ( gHUD.m_iHideHUDDisplay & ( HIDEHUD_FLASHLIGHT | HIDEHUD_ALL ) )
 		return 1;
 

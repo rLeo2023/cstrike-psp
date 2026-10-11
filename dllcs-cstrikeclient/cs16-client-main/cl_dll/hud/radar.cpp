@@ -280,6 +280,11 @@ void CHudRadar::DrawZAxis( Vector pos, int r, int g, int b, int a )
 
 int CHudRadar::Draw(float flTime)
 {
+#ifdef __PSP__
+	// no radar on the small screen, its sprites aren't even loaded (hud.cpp)
+	return 1;
+#endif
+
 	if ( (gHUD.m_iHideHUDDisplay & HIDEHUD_HEALTH) ||
 		 gEngfuncs.IsSpectateOnly() ||
 		 !(gHUD.m_iWeaponBits & (1<<(WEAPON_SUIT))) ||

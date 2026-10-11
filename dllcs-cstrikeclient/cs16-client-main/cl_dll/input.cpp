@@ -26,6 +26,9 @@
 
 #include "vgui_parser.h"
 #include "com_weapons.h"
+#include "event_api.h"
+#include "pmtrace.h"
+#include "pm_defs.h"
 
 extern int g_weaponselect;
 extern cl_enginefunc_t gEngfuncs;
@@ -64,6 +67,9 @@ cvar_t	*cl_yawspeed;
 cvar_t	*cl_pitchspeed;
 cvar_t	*cl_anglespeedkey;
 cvar_t	*cl_vsmoothing;
+cvar_t	*cl_autoaim;
+cvar_t	*cl_autoaim_fov;
+cvar_t	*cl_autoaim_speed;
 /*
 ===============================================================================
 
@@ -644,6 +650,116 @@ void CL_AdjustAngles ( float frametime, float *viewangles )
 		viewangles[ROLL] = -50;
 }
 
+static float CL_AngleDelta( float a )
+{
+	while( a > 180.0f ) a -= 360.0f;
+	while( a < -180.0f ) a += 360.0f;
+	return a;
+}
+
+/*
+================
+CL_AutoAim
+
+Aim assist for gamepads: when a visible enemy is close to the crosshair the
+view is pulled towards him at cl_autoaim_speed degrees per second. The view
+angles are what get sent to the server, so bullets go where the crosshair is
+================
+*/
+void CL_AutoAim( float frametime, float *viewangles )
+{
+	cl_entity_t *local = gEngfuncs.GetLocalPlayer();
+
+	if( !cl_autoaim->value || !local || frametime <= 0.0f )
+		return;
+
+	int localIndex = local->index;
+	int myTeam = g_PlayerExtraInfo[localIndex].teamnumber;
+
+	if( !myTeam || g_PlayerExtraInfo[localIndex].dead || g_iUser1 )
+		return;
+
+	Vector eye, viewOfs;
+	gEngfuncs.pEventAPI->EV_LocalPlayerViewheight( viewOfs );
+	eye = local->origin + viewOfs;
+
+	float bestScore = 1e9f, bestYaw = 0.0f, bestPitch = 0.0f;
+	bool found = false;
+	int maxClients = gEngfuncs.GetMaxClients();
+
+	for( int i = 1; i <= maxClients && i <= MAX_PLAYERS; i++ )
+	{
+		if( i == localIndex )
+			continue;
+
+		const extra_player_info_t &info = g_PlayerExtraInfo[i];
+		if( info.dead || !info.teamnumber || info.teamnumber == myTeam )
+			continue;
+
+		cl_entity_t *ent = gEngfuncs.GetEntityByIndex( i );
+		if( !ent || !ent->player || !ent->model || ( ent->curstate.effects & EF_NODRAW ))
+			continue;
+
+		// not in the last update: out of sight
+		if( ent->curstate.messagenum < local->curstate.messagenum )
+			continue;
+
+		// chest, a bit lower when ducking
+		Vector target = ent->origin;
+		target.z += ( ent->curstate.usehull == 1 ) ? 4.0f : 10.0f;
+
+		Vector dir = target - eye;
+		float flat = sqrt( dir.x * dir.x + dir.y * dir.y );
+		float dist = dir.Length();
+		if( dist < 1.0f || dist > 3000.0f )
+			continue;
+
+		float yaw = atan2( dir.y, dir.x ) * ( 180.0f / M_PI );
+		float pitch = -atan2( dir.z, flat ) * ( 180.0f / M_PI );
+		float dyaw = CL_AngleDelta( yaw - viewangles[YAW] );
+		float dpitch = CL_AngleDelta( pitch - viewangles[PITCH] );
+
+		// the cone grows with the angular size of the target
+		float cone = cl_autoaim_fov->value + atan2( 16.0f, dist ) * ( 180.0f / M_PI );
+		if( fabs( dyaw ) > cone || fabs( dpitch ) > cone )
+			continue;
+
+		float score = dyaw * dyaw + dpitch * dpitch;
+		if( score >= bestScore )
+			continue;
+
+		// walls in between?
+		pmtrace_t tr;
+		gEngfuncs.pEventAPI->EV_SetUpPlayerPrediction( false, true );
+		gEngfuncs.pEventAPI->EV_PushPMStates();
+		gEngfuncs.pEventAPI->EV_SetSolidPlayers( -1 );
+		gEngfuncs.pEventAPI->EV_SetTraceHull( 2 );
+		gEngfuncs.pEventAPI->EV_PlayerTrace( eye, target, PM_WORLD_ONLY, -1, &tr );
+		gEngfuncs.pEventAPI->EV_PopPMStates();
+
+		if( tr.fraction < 0.99f )
+			continue;
+
+		bestScore = score;
+		bestYaw = dyaw;
+		bestPitch = dpitch;
+		found = true;
+	}
+
+	if( !found )
+		return;
+
+	float step = cl_autoaim_speed->value * frametime;
+
+	if( bestYaw > step ) bestYaw = step;
+	else if( bestYaw < -step ) bestYaw = -step;
+	if( bestPitch > step ) bestPitch = step;
+	else if( bestPitch < -step ) bestPitch = -step;
+
+	viewangles[YAW] = anglemod( viewangles[YAW] + bestYaw );
+	viewangles[PITCH] += bestPitch;
+}
+
 /*
 ================
 CL_CreateMove
@@ -666,6 +782,7 @@ void DLLEXPORT CL_CreateMove ( float frametime, struct usercmd_s *cmd, int activ
 		gEngfuncs.GetViewAngles( (float *)viewangles );
 
 		CL_AdjustAngles ( frametime, viewangles );
+		CL_AutoAim( frametime, viewangles );
 
 		memset (cmd, 0, sizeof(*cmd));
 		
@@ -976,8 +1093,18 @@ void InitInput (void)
 	lookstrafe			= gEngfuncs.pfnRegisterVariable ( "lookstrafe", "0", FCVAR_ARCHIVE );
 	lookspring			= gEngfuncs.pfnRegisterVariable ( "lookspring", "0", FCVAR_ARCHIVE );
 	cl_anglespeedkey	= gEngfuncs.pfnRegisterVariable ( "cl_anglespeedkey", "0.67", 0 );
+#ifdef __PSP__
+	// the face buttons turn the view: saved, the controls menu changes them
+	// (a negative pitch speed inverts the vertical look)
+	cl_yawspeed			= gEngfuncs.pfnRegisterVariable ( "cl_yawspeed", "180", FCVAR_ARCHIVE );
+	cl_pitchspeed		= gEngfuncs.pfnRegisterVariable ( "cl_pitchspeed", "150", FCVAR_ARCHIVE );
+#else
 	cl_yawspeed			= gEngfuncs.pfnRegisterVariable ( "cl_yawspeed", "210", 0 );
 	cl_pitchspeed		= gEngfuncs.pfnRegisterVariable ( "cl_pitchspeed", "225", 0 );
+#endif
+	cl_autoaim			= gEngfuncs.pfnRegisterVariable ( "cl_autoaim", "0", FCVAR_ARCHIVE );
+	cl_autoaim_fov		= gEngfuncs.pfnRegisterVariable ( "cl_autoaim_fov", "6", FCVAR_ARCHIVE );
+	cl_autoaim_speed	= gEngfuncs.pfnRegisterVariable ( "cl_autoaim_speed", "60", FCVAR_ARCHIVE );
 	cl_upspeed			= gEngfuncs.pfnRegisterVariable ( "cl_upspeed", "320", 0 );
 	cl_forwardspeed		= gEngfuncs.pfnRegisterVariable ( "cl_forwardspeed", "400", FCVAR_ARCHIVE );
 	cl_backspeed		= gEngfuncs.pfnRegisterVariable ( "cl_backspeed", "400", FCVAR_ARCHIVE );

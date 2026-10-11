@@ -27,6 +27,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define ART_BANNER	     	"gfx/shell/head_config"
 
+#ifdef MAINUI_PSP
+static void UI_SaveSettings( void )
+{
+	EngFuncs::ClientCmd( FALSE, "trysaveconfig\n" );
+	EngFuncs::PlayLocalSound( uiSoundLaunch );
+}
+#endif
+
 class CMenuOptions: public CMenuFramework
 {
 private:
@@ -56,8 +64,13 @@ void CMenuOptions::_Init( void )
 
 	AddItem( background );
 	AddItem( banner );
+#ifdef MAINUI_PSP
+	AddButton( L( "Controls" ), L( "Look speed, analog stick, auto-aim and crosshair" ),
+		PC_CONTROLS, UI_AdvControls_Menu, QMF_NOTIFY );
+#else
 	AddButton( L( "Controls" ), L( "Change keyboard and mouse settings" ),
 		PC_CONTROLS, UI_Controls_Menu, QMF_NOTIFY );
+#endif
 	AddButton( L( "GameUI_Audio" ), L( "Change sound volume and quality" ),
 		PC_AUDIO, UI_Audio_Menu, QMF_NOTIFY );
 	AddButton( L( "GameUI_Video" ), L( "Change screen size, video mode and gamma" ),
@@ -67,13 +80,18 @@ void CMenuOptions::_Init( void )
 #ifndef MAINUI_PSP
 		AddButton( L( "Touch" ), L( "Change touch settings and buttons" ),
 			PC_TOUCH, UI_Touch_Menu, QMF_NOTIFY );
-#endif
+		// on PSP the stick and look settings live in Controls -> Adv. Controls
 		AddButton( L( "GameUI_Joystick" ), L( "Change gamepad axis and button settings" ),
 			PC_GAMEPAD, UI_GamePad_Menu, QMF_NOTIFY );
+#endif
 	}
 #ifndef MAINUI_PSP
 	AddButton( L( "Update" ), L( "Check for updates" ),
 		PC_UPDATE, msgBox.MakeOpenEvent(), QMF_NOTIFY );
+#else
+	// every settings page already saves on Done, this is the explicit way
+	AddButton( L( "Save settings" ), L( "Save all settings now (controls, video, audio, auto-aim)" ),
+		PC_SAVE_GAME, UI_SaveSettings, QMF_NOTIFY );
 #endif
 	AddButton( L( "Done" ), L( "Go back to the Main menu" ),
 		PC_DONE, VoidCb( &CMenuOptions::Hide ), QMF_NOTIFY );

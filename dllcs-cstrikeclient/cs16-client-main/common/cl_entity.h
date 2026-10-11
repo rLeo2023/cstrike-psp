@@ -62,7 +62,12 @@ typedef struct
 
 typedef struct cl_entity_s cl_entity_t;
 
+#ifdef __PSP__
+// MUST match the engine's common/cl_entity.h (the struct is shared)
+#define HISTORY_MAX		16  // Must be power of 2
+#else
 #define HISTORY_MAX		64  // Must be power of 2
+#endif
 #define HISTORY_MASK	( HISTORY_MAX - 1 )
 
 

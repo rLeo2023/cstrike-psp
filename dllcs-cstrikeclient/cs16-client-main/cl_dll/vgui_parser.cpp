@@ -104,6 +104,75 @@ static void Dictionary_Insert( const char *key, const char *value )
 	}
 }
 
+// COM_ParseFile of this engine ends a quoted string at the first quote, but
+// the localization files escape quotes inside strings ("The \"%s1\" alias"):
+// one of those and every key after it gets paired with the wrong string.
+// Same rules otherwise: whitespace, // comments, quoted strings, words, braces
+static char *Localize_ParseToken( char *data, char *token, size_t size )
+{
+	size_t len = 0;
+	int c;
+
+	token[0] = 0;
+
+	if( !data )
+		return NULL;
+
+skipwhite:
+	while(( c = (unsigned char)*data ) <= ' ' )
+	{
+		if( !c )
+			return NULL;
+		data++;
+	}
+
+	if( c == '/' && data[1] == '/' )
+	{
+		while( *data && *data != '\n' )
+			data++;
+		goto skipwhite;
+	}
+
+	if( c == '\"' )
+	{
+		data++;
+		while(( c = (unsigned char)*data ))
+		{
+			data++;
+
+			if( c == '\\' && *data == '\"' )
+			{
+				c = '\"';
+				data++;
+			}
+			else if( c == '\"' )
+				break;
+
+			if( len + 1 < size )
+				token[len++] = c;
+		}
+		token[len] = 0;
+		return data;
+	}
+
+	if( c == '{' || c == '}' )
+	{
+		token[0] = c;
+		token[1] = 0;
+		return data + 1;
+	}
+
+	while(( c = (unsigned char)*data ) > ' ' && c != '{' && c != '}' && c != '\"' )
+	{
+		if( len + 1 < size )
+			token[len++] = c;
+		data++;
+	}
+	token[len] = 0;
+
+	return data;
+}
+
 static void Localize_AddToDictionary( const char *name, const char *lang )
 {
 	char filename[64], token[4096];
@@ -165,7 +234,7 @@ static void Localize_AddToDictionary( const char *name, const char *lang )
 
 	pfile = afile;
 
-	pfile = gEngfuncs.COM_ParseFile( pfile, token );
+	pfile = Localize_ParseToken( pfile, token, sizeof( token ));
 
 	if( stricmp( token, "lang" ))
 	{
@@ -173,7 +242,7 @@ static void Localize_AddToDictionary( const char *name, const char *lang )
 		goto error;
 	}
 
-	pfile = gEngfuncs.COM_ParseFile( pfile, token );
+	pfile = Localize_ParseToken( pfile, token, sizeof( token ));
 
 	if( strcmp( token, "{" ))
 	{
@@ -181,7 +250,7 @@ static void Localize_AddToDictionary( const char *name, const char *lang )
 		goto error;
 	}
 
-	pfile = gEngfuncs.COM_ParseFile( pfile, token );
+	pfile = Localize_ParseToken( pfile, token, sizeof( token ));
 
 	if( stricmp( token, "Language" ))
 	{
@@ -190,9 +259,9 @@ static void Localize_AddToDictionary( const char *name, const char *lang )
 	}
 
 	// skip language actual name
-	pfile = gEngfuncs.COM_ParseFile( pfile, token );
+	pfile = Localize_ParseToken( pfile, token, sizeof( token ));
 
-	pfile = gEngfuncs.COM_ParseFile( pfile, token );
+	pfile = Localize_ParseToken( pfile, token, sizeof( token ));
 
 	if( stricmp( token, "Tokens" ))
 	{
@@ -200,7 +269,7 @@ static void Localize_AddToDictionary( const char *name, const char *lang )
 		goto error;
 	}
 
-	pfile = gEngfuncs.COM_ParseFile( pfile, token );
+	pfile = Localize_ParseToken( pfile, token, sizeof( token ));
 
 	if( strcmp( token, "{" ))
 	{
@@ -208,13 +277,13 @@ static void Localize_AddToDictionary( const char *name, const char *lang )
 		goto error;
 	}
 
-	while( (pfile = gEngfuncs.COM_ParseFile( pfile, token )))
+	while( (pfile = Localize_ParseToken( pfile, token, sizeof( token ))))
 	{
 		if( !strcmp( token, "}" ))
 			break;
 
 		char szLocString[4096];
-		pfile = gEngfuncs.COM_ParseFile( pfile, szLocString );
+		pfile = Localize_ParseToken( pfile, szLocString, sizeof( szLocString ));
 
 		if( !strcmp( szLocString, "}" ))
 			break;

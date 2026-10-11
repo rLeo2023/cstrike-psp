@@ -57,7 +57,14 @@ typedef struct
 
 typedef struct cl_entity_s cl_entity_t;
 
+#ifdef __PSP__
+// every client entity and temp entity carries this history (28 bytes each):
+// 64 cost ~2MB in total. 16 updates are plenty on a local server.
+// MUST match cs16-client's common/cl_entity.h.
+#define HISTORY_MAX		16		// Must be power of 2
+#else
 #define HISTORY_MAX		64		// Must be power of 2
+#endif
 #define HISTORY_MASK	( HISTORY_MAX - 1 )
 
 #include "entity_state.h"

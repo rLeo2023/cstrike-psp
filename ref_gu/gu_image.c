@@ -305,21 +305,39 @@ static void GL_SetTextureDimensions( gl_texture_t *tex, int width, int height )
 ================
 GL_ShrinkTextureDimensions
 
-PSP memory saving: effect sprites (smoke, explosions, puffs) are blended
-and moving, other players are seen from afar, so half resolution doesn't
-show and saves 3/4 of their memory. HUD sprites ("#HUD/") and first person
-weapons keep full size. Only formats the uploader can resample qualify.
+PSP memory saving: half resolution saves 3/4 of a texture. Everything
+samples textures with normalized coordinates computed from the original
+size, so a smaller upload just looks softer. On a 480x272 screen:
+- effect sprites and other players (moving, blended, far): from 64 pixels
+- first person weapons, world, sky and sniper scope: from 128 pixels
+HUD, menu art, fonts, lightmaps and decals keep full size. Only formats the
+uploader can resample qualify.
 ================
 */
 static void GL_ShrinkTextureDimensions( gl_texture_t *tex, const rgbdata_t *pic )
 {
+	static const char *const from64[] = { "#sprites/", "#models/player/" };
+	// not "#HUD/" (too blurry) nor "resource/background/": the menu background
+	// tiles are placed by their uploaded size, halving them broke the menu
+	static const char *const from128[] = { "#models/", "#maps/", "sprites/", "gfx/env/" };
+	int i, minSize = 0;
+
 	if( !ImageIND( pic->type ) && pic->type != PF_RGBA_32 && pic->type != PF_BGRA_32 )
 		return;
 
-	if( tex->width < 64 || tex->height < 64 )
-		return;
+	for( i = 0; i < (int)( sizeof( from64 ) / sizeof( from64[0] )) && !minSize; i++ )
+		if( !Q_strnicmp( tex->name, from64[i], Q_strlen( from64[i] )))
+			minSize = 64;
 
-	if( Q_strnicmp( tex->name, "#sprites/", 9 ) && Q_strnicmp( tex->name, "#models/player/", 15 ))
+	for( i = 0; i < (int)( sizeof( from128 ) / sizeof( from128[0] )) && !minSize; i++ )
+		if( !Q_strnicmp( tex->name, from128[i], Q_strlen( from128[i] )))
+			minSize = 128;
+
+	// world textures from the map's wads: "cs_dust.wad/SandRoad.mip"
+	if( !minSize && Q_stristr( tex->name, ".wad/" ))
+		minSize = 128;
+
+	if( !minSize || Q_max( tex->width, tex->height ) < minSize || Q_min( tex->width, tex->height ) < 32 )
 		return;
 
 	tex->width >>= 1;

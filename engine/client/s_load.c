@@ -159,6 +159,12 @@ wavdata_t *S_LoadSound( sfx_t *sfx )
 	else if( sc->rate > SOUND_22k && sc->rate <= SOUND_32k ) // some bad sounds
 		Sound_Process( &sc, SOUND_44k, sc->width, SOUND_RESAMPLE );
 
+#if XASH_PSP
+	// half the memory (a quarter for 44 kHz sounds): 8 bit, at most 22 kHz
+	if( sc->width == 2 || sc->rate > SOUND_22k )
+		Sound_Process( &sc, Q_min( sc->rate, SOUND_22k ), 1, SOUND_RESAMPLE );
+#endif
+
 	sfx->cache = sc;
 
 	return sfx->cache;

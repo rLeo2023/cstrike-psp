@@ -77,7 +77,11 @@ int CHudHealth::Init(void)
 
 	memset(m_dmg, 0, sizeof(DAMAGE_IMAGE) * NUM_DMG_TYPES);
 
+#ifdef __PSP__
+	CVAR_CREATE("cl_corpsestay", "2", FCVAR_ARCHIVE);
+#else
 	CVAR_CREATE("cl_corpsestay", "600", FCVAR_ARCHIVE);
+#endif
 	gHUD.AddHudElem(this);
 	return 1;
 }

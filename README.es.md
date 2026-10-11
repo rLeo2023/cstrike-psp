@@ -4,7 +4,7 @@
 
 Port de Counter-Strike 1.6 a la PSP sobre el motor [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs),
 partiendo del port de PSP de [Crow-bar](https://github.com/Crow-bar/xash3d-fwgs).
-Se juega contra bots en servidor local, y anda en PSP y en PPSSPP.
+Se juega contra bots en servidor local, hasta 5 contra 5, y anda en PSP y en PPSSPP.
 
 Este repositorio contiene **solo código y configuración**. No incluye ningún archivo del juego
 (mapas, modelos, sonidos, texturas): hace falta una copia legal de Counter-Strike 1.6.
@@ -35,13 +35,23 @@ python3 ./waf build
 
 El resultado queda en `build/engine/EBOOT.PBP` y `build/engine/xash.prx`.
 
+## Requisitos
+
+- Una PSP con 64 MB de RAM (PSP-2000, 3000, Go o E1000). La PSP-1000 tiene 32 MB y no alcanza.
+- Un custom firmware con **Force Extra Memory** activado (ARK-4 / PRO / ME: en el menú recovery o
+  VSH, "Force Extra Memory" / "Use high memory layout"). **Sin eso el juego no arranca.**
+  En PPSSPP no hace falta nada.
+- Una copia legal de Counter-Strike 1.6.
+
 ## Instalar
 
 1. Crear una carpeta en `PSP/GAME/` de la memory stick (por ejemplo `PSP/GAME/cstrike/`).
 2. Copiar ahí `EBOOT.PBP` y `xash.prx`.
 3. Copiar desde tu Counter-Strike 1.6 las carpetas `valve/` y `cstrike/`.
 4. Copiar el contenido de `gamedata/cstrike/` de este repositorio encima de `cstrike/`.
-5. En `cstrike/gameinfo.txt`, poner `max_edicts "600"`: ahorra memoria.
+5. Copiar `extras.pak` (el paquete de recursos de Xash3D FWGS: fuentes y botones del menú) en `valve/`.
+   La carpeta `valve/` de Steam no lo trae y sin él el juego queda en pantalla negra.
+   Viene incluido en el release.
 6. Los bots necesitan `cstrike/BotProfile.db`. Viene con ReGameDLL_CS (`regamedll/extra/zBot/bot_profiles.zip` en su repositorio).
 
 ## Controles
@@ -51,33 +61,40 @@ El resultado queda en `build/engine/EBOOT.PBP` y `build/engine/xash.prx`.
 | Analógico | Moverse |
 | △ / ✕ / □ / ○ | Mirar arriba / abajo / izquierda / derecha |
 | Cruceta ↑ / ↓ | Saltar / agacharse |
-| Cruceta ← / → | Usar y recargar / siguiente arma |
+| Cruceta ← / → | Siguiente arma / usar y recargar |
 | R / L | Disparar / ataque secundario |
 | SELECT | Menú de compra (incluye "9. Autobuy", según `autobuy.txt`) |
 | START | Menú |
 
 En los menús de texto: cruceta ↑/↓ mueve el cursor, ✕ elige, ○ cierra.
-Todo se cambia en `cstrike/userconfig.cfg`.
+Los botones se cambian en `cstrike/userconfig.cfg`. La velocidad de cámara, invertir la vista, la
+velocidad y zona muerta del analógico, la ayuda de apuntado y la mira están en Options → Controls.
+La configuración se guarda al salir de cada página de opciones y con Options → Save settings.
 
 ## Cambios principales respecto de los proyectos originales
 
 - **Memoria**: heap fijo de 40 MB; un solo modelo por equipo (terror / gign) y `player.mdl` reemplazado
-  por el modelo CT; texturas compartidas entre modelos y sin mipmaps en armas y sprites; sprites de
-  efectos y texturas de jugadores a media resolución; sonidos cargados al primer uso; malla de
-  navegación de los bots leída por partes y cargada solo si hay bots; carga de modelos sin copias
-  intermedias.
+  por el modelo CT; texturas compartidas entre modelos y sin mipmaps en armas y sprites; texturas de
+  armas, mapa, cielo y efectos a media resolución (HUD y menús completos); sonidos pasados a 8 bits /
+  22 kHz y cargados al primer uso; malla de navegación de los bots leída por partes y cargada solo si
+  hay bots; carga de modelos sin copias intermedias; menos historial de entidades, efectos
+  temporales, partículas y haces; sin radar; los cadáveres desaparecen después de la animación de
+  muerte. Dust2 5v5 deja ~7 MB libres.
 - **Render**: recorte por software de los triángulos del arma en primera persona; arreglo de las caras
-  ocultas con `cl_righthand 1`; mira visible con `hud_scale` < 1.
+  ocultas con `cl_righthand 1`; mira visible con `hud_scale` < 1; límite de 45 fps que duerme en vez
+  de esperar en un bucle (ahorra batería).
 - **Juego**: menús de texto con cursor para el gamepad (selección de equipo, compra), autobuy en el
-  menú de compra, menú de partida con mapa y bots, título del EBOOT "Counter-Strike".
+  menú de compra, menú de partida con mapa, cantidad de bots y dificultad (Easy / Medium), ayuda de
+  apuntado, página de controles para PSP, configuración que se guarda en el momento, textos de ayuda
+  traducidos, recargas arregladas (el servidor se compila con `CLIENT_WEAPONS`), título del EBOOT
+  "Counter-Strike".
 
 ## Problemas conocidos
 
 - Cambiar de mapa después de jugar uno puede quedarse sin memoria por fragmentación del heap.
   Reiniciar el juego antes de cambiar de mapa.
-- Algunos textos de ayuda aparecen como clave sin traducir (`Cstrike_TitlesTXT_...`).
 - Mapas grandes pueden no entrar en memoria.
-- Con 3 bots (2v2) la memoria queda justa.
+- Con muchos bots (4v4, 5v5) bajan los fps en los momentos con mucha acción.
 
 ## Créditos y licencias
 

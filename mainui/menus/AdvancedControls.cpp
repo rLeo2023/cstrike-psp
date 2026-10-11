@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define ART_BANNER			"gfx/shell/head_advanced"
 
+#ifndef MAINUI_PSP
+
 class CAdvancedControls : public CMenuFramework
 {
 public:
@@ -210,5 +212,129 @@ void CAdvancedControls::_VidInit()
 {
 	GetConfig();
 }
+
+#else // MAINUI_PSP
+
+// PSP: no mouse. The analog stick moves (joy_forward/joy_side, negative
+// because the PSP reports the stick negated), the face buttons turn
+// (cl_yawspeed/cl_pitchspeed, a negative pitch speed inverts), plus the
+// client side aim assist. Replaces the separate Gamepad menu.
+class CAdvancedControls : public CMenuFramework
+{
+public:
+	typedef CMenuFramework BaseClass;
+	CAdvancedControls() : CMenuFramework("CAdvancedControls") { }
+
+private:
+	void _Init( void ) override;
+	void _VidInit( void ) override;
+	void SaveAndPopMenu() override;
+
+	void GetConfig( void );
+
+	CMenuPicButton done;
+
+	CMenuCheckBox	crosshair;
+	CMenuCheckBox	autoaim;
+	CMenuCheckBox	invertLook;
+	CMenuSlider	autoaimSpeed;
+	CMenuSlider	lookYaw;
+	CMenuSlider	lookPitch;
+	CMenuSlider	moveSens;
+	CMenuSlider	deadzone;
+};
+
+void CAdvancedControls::GetConfig( void )
+{
+	float pitchSpeed = EngFuncs::GetCvarFloat( "cl_pitchspeed" );
+
+	crosshair.LinkCvar( "crosshair" );
+	autoaim.LinkCvar( "cl_autoaim" );
+	autoaimSpeed.LinkCvar( "cl_autoaim_speed" );
+	lookYaw.LinkCvar( "cl_yawspeed" );
+	deadzone.LinkCvar( "psp_joy_dz_min" );
+
+	invertLook.bChecked = pitchSpeed < 0.0f;
+	lookPitch.SetCurrentValue( fabs( pitchSpeed ));
+	moveSens.SetCurrentValue( fabs( EngFuncs::GetCvarFloat( "joy_forward" )));
+}
+
+void CAdvancedControls::SaveAndPopMenu()
+{
+	crosshair.WriteCvar();
+	autoaim.WriteCvar();
+	autoaimSpeed.WriteCvar();
+	lookYaw.WriteCvar();
+	deadzone.WriteCvar();
+
+	float pitchSpeed = lookPitch.GetCurrentValue();
+	EngFuncs::CvarSetValue( "cl_pitchspeed", invertLook.bChecked ? -pitchSpeed : pitchSpeed );
+
+	float move = moveSens.GetCurrentValue();
+	EngFuncs::CvarSetValue( "joy_forward", -move );
+	EngFuncs::CvarSetValue( "joy_side", -move );
+
+	CMenuFramework::SaveAndPopMenu();
+}
+
+void CAdvancedControls::_Init( void )
+{
+	banner.SetPicture( ART_BANNER );
+
+	done.SetNameAndStatus( L( "Done" ), L( "save changed and go back to the Customize Menu" ) );
+	done.SetPicture( PC_DONE );
+	done.onReleased = VoidCb( &CAdvancedControls::SaveAndPopMenu );
+	done.SetCoord( 72, 680 );
+
+	// left column: checkboxes
+	crosshair.SetNameAndStatus( L( "Crosshair" ), L( "Enable the weapon aiming crosshair" ) );
+	crosshair.SetCoord( 72, 240 );
+
+	autoaim.SetNameAndStatus( L( "GameUI_AutoAim" ), L( "Pull the crosshair towards visible enemies close to it" ) );
+	autoaim.SetCoord( 72, 300 );
+
+	invertLook.SetNameAndStatus( L( "Invert look" ), L( "Triangle looks down, cross looks up" ) );
+	invertLook.SetCoord( 72, 360 );
+
+	autoaimSpeed.SetNameAndStatus( L( "Aim power" ), L( "How fast the crosshair is pulled towards the enemy" ) );
+	autoaimSpeed.Setup( 20.0f, 150.0f, 10.0f );
+	autoaimSpeed.SetCoord( 72, 470 );
+
+	// right column: sliders
+	lookYaw.SetNameAndStatus( L( "Turn speed" ), L( "Square / circle turn speed, degrees per second" ) );
+	lookYaw.Setup( 60.0f, 360.0f, 10.0f );
+	lookYaw.SetCoord( 560, 270 );
+
+	lookPitch.SetNameAndStatus( L( "Look speed" ), L( "Triangle / cross look speed, degrees per second" ) );
+	lookPitch.Setup( 60.0f, 300.0f, 10.0f );
+	lookPitch.SetCoord( 560, 370 );
+
+	moveSens.SetNameAndStatus( L( "Move speed" ), L( "Movement speed with the stick fully pushed" ) );
+	moveSens.Setup( 0.2f, 1.0f, 0.1f );
+	moveSens.SetCoord( 560, 470 );
+
+	deadzone.SetNameAndStatus( L( "Deadzone" ), L( "Stick movement ignored around the center (0 - 127)" ) );
+	deadzone.Setup( 0.0f, 60.0f, 1.0f );
+	deadzone.SetCoord( 560, 570 );
+
+	AddItem( background );
+	AddItem( banner );
+	AddItem( done );
+	AddItem( crosshair );
+	AddItem( autoaim );
+	AddItem( invertLook );
+	AddItem( autoaimSpeed );
+	AddItem( lookYaw );
+	AddItem( lookPitch );
+	AddItem( moveSens );
+	AddItem( deadzone );
+}
+
+void CAdvancedControls::_VidInit()
+{
+	GetConfig();
+}
+
+#endif // MAINUI_PSP
 
 ADD_MENU( menu_advcontrols, CAdvancedControls, UI_AdvControls_Menu );

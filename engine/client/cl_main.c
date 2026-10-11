@@ -180,6 +180,10 @@ finalize connection process and begin new frame
 with new cls.state
 ===============
 */
+#if XASH_PSP
+static double psp_reportTime;
+#endif
+
 void CL_CheckClientState( void )
 {
 	// first update is the pre-final signon stage
@@ -199,11 +203,26 @@ void CL_CheckClientState( void )
 		{
 			void PSP_LogHeapUsage( const char *when );
 			PSP_LogHeapUsage( va( "in game on %s", clgame.mapname ));
+			psp_reportTime = host.realtime + 90.0;
 		}
 #endif
 		if(( cls.demoplayback || cls.disable_servercount != cl.servercount ) && cl.video_prepped )
 			SCR_EndLoadingPlaque(); // get rid of loading plaque
 	}
+
+#if XASH_PSP
+	// sounds, decals and corpses load while playing: a second report once
+	// the round is going, with the pools and textures (first map only)
+	if( psp_reportTime && cls.state == ca_active && host.realtime > psp_reportTime )
+	{
+		void PSP_LogHeapUsage( const char *when );
+		void Mem_PrintReport( void );
+
+		psp_reportTime = 0;
+		PSP_LogHeapUsage( va( "90 s into %s", clgame.mapname ));
+		Mem_PrintReport();
+	}
+#endif
 }
 
 int CL_GetFragmentSize( void *unused, fragsize_t mode )
@@ -1552,6 +1571,21 @@ void CL_Crashed( void )
 
 /*
 =================
+CL_TrySaveConfig_f
+
+Settings were only written on a clean quit; on the PSP the game is often
+left with HOME, which lost every change. The menu asks for this on Done.
+=================
+*/
+static void CL_TrySaveConfig_f( void )
+{
+	Host_WriteOpenGLConfig();
+	Host_WriteVideoConfig();
+	Host_WriteConfig();
+}
+
+/*
+=================
 CL_LocalServers_f
 =================
 */
@@ -2890,6 +2924,8 @@ void CL_InitLocal( void )
 
 	Cmd_AddCommand ("setinfo", CL_SetInfo_f, "examine or change the userinfo string (alias of userinfo)" );
 	Cmd_AddCommand ("userinfo", CL_SetInfo_f, "examine or change the userinfo string (alias of setinfo)" );
+	// the menu sends it whenever a settings page is closed with Done/OK
+	Cmd_AddCommand ("trysaveconfig", CL_TrySaveConfig_f, "save settings (config.cfg, video and renderer configs) right now" );
 	Cmd_AddCommand ("physinfo", CL_Physinfo_f, "print current client physinfo" );
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f, "disconnect from server" );
 	Cmd_AddCommand ("record", CL_Record_f, "record a demo" );

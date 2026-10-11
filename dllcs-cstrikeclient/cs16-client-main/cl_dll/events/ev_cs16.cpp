@@ -750,7 +750,13 @@ void CreateCorpse(Vector vOrigin, Vector vAngles, const char *pModel, float flAn
 		model->callback = RemoveBody;
 		model->hitcallback = HitBody;
 		model->bounceFactor = 0.0f;
+#ifdef __PSP__
+		// every corpse is a full player model drawn each frame: keep it
+		// cl_corpsestay seconds, then a one second fade out (FTENT_FADEOUT)
+		model->die = gEngfuncs.GetClientTime() + gEngfuncs.pfnGetCvarFloat("cl_corpsestay") + 1.0f;
+#else
 		model->die = gEngfuncs.GetClientTime() + gEngfuncs.pfnGetCvarFloat("cl_corpsestay") + 9.0f;
+#endif
 		//model->entity.curstate.renderfx = kRenderFxDeadPlayer;
 		//model->entity.curstate.fuser4 = gHUD.m_flTime;
 

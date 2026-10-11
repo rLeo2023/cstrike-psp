@@ -21,6 +21,7 @@ the Free Software Foundation, either version 3 of the License, or
 #include "PicButton.h"
 #include "Table.h"
 #include "Slider.h"
+#include "CheckBox.h"
 #include "YesNoMessageBox.h"
 #include "MenuStrings.h"
 
@@ -76,6 +77,11 @@ public:
 	// expresses it too: the checkbox off is just a zero count
 	CMenuSlider botCount;
 
+	// bot difficulty, a pair of radio buttons: the server copies
+	// cs_menu_botdiff to bot_difficulty when the map starts (0 easy, 1 normal)
+	CMenuCheckBox diffEasy, diffMedium;
+	void SetDifficulty( int diff );
+
 	CMenuPicButton *done;
 	CMenuPicButton *botsToggle;
 
@@ -103,6 +109,13 @@ void CMenuCounterStrike::ToggleBotsCb( CMenuBaseItem *pSelf, void *pExtra )
 
 	menu->botCount.SetCurrentValue( value );
 	menu->botCount.WriteCvar();
+}
+
+void CMenuCounterStrike::SetDifficulty( int diff )
+{
+	diffEasy.bChecked = ( diff == 0 );
+	diffMedium.bChecked = ( diff != 0 );
+	EngFuncs::CvarSetValue( "cs_menu_botdiff", diff ? 1.0f : 0.0f );
 }
 
 /*
@@ -228,8 +241,8 @@ void CMenuCounterStrike::StartGameCb( CMenuBaseItem *pSelf, void *pExtra )
 	// bot_quota/bot_difficulty are registered by the game library, which is
 	// only loaded by "map", so they have to come after it in the buffer.
 	char cmd[1024];
-	sprintf( cmd, "endgame;menu_connectionprogress localserver;wait;wait;wait;maxplayers %i;latch;map %s;bot_difficulty 1;bot_quota %i\n",
-		players, cmd2, bots );
+	sprintf( cmd, "endgame;menu_connectionprogress localserver;wait;wait;wait;maxplayers %i;latch;map %s;bot_difficulty %i;bot_quota %i\n",
+		players, cmd2, (int)EngFuncs::GetCvarFloat( "cs_menu_botdiff" ), bots );
 	EngFuncs::ClientCmd( FALSE, cmd );
 }
 
@@ -269,6 +282,16 @@ void CMenuCounterStrike::_Init( void )
 	botCount.LinkCvar( "cs_menu_botcount" );
 	AddItem( botCount );
 
+	EngFuncs::CvarRegister( "cs_menu_botdiff", "1", FCVAR_ARCHIVE );
+
+	diffEasy.SetNameAndStatus( "Easy", "Easy bots: slower reactions, worse aim" );
+	SET_EVENT( diffEasy.onChanged, ((CMenuCounterStrike *)pSelf->Parent())->SetDifficulty( 0 ));
+	AddItem( diffEasy );
+
+	diffMedium.SetNameAndStatus( "Medium", "Normal bots" );
+	SET_EVENT( diffMedium.onChanged, ((CMenuCounterStrike *)pSelf->Parent())->SetDifficulty( 1 ));
+	AddItem( diffMedium );
+
 	// Both controls need an explicit rect, the framework only places the
 	// AddButton ones. Units are MainUI's virtual 1024x768 space; on PSP the
 	// scale is 272/768 (~0.35), so the visible width is ~1355 units.
@@ -277,6 +300,8 @@ void CMenuCounterStrike::_Init( void )
 	// its label is drawn 1.5 font heights above it and ran into the list.
 	mapsList.SetRect( 340, 210, 880, 440 );
 	botCount.SetRect( 72, 380, 230, 30 );
+	diffEasy.SetCoord( 72, 450 );
+	diffMedium.SetCoord( 72, 510 );
 
 	msgBox.SetMessage( "Start the selected map?" );
 	msgBox.HighlightChoice( CMenuYesNoMessageBox::HIGHLIGHT_YES );
@@ -287,6 +312,7 @@ void CMenuCounterStrike::_VidInit( void )
 {
 	Con_Printf( "S_PSP: CMenuCounterStrike::_VidInit enter\n" );
 	uiStatic.needMapListUpdate = true;
+	SetDifficulty( (int)EngFuncs::GetCvarFloat( "cs_menu_botdiff" ));
 }
 
 ADD_MENU( menu_counterstrike, CMenuCounterStrike, UI_CounterStrike_Menu );

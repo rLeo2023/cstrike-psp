@@ -1767,10 +1767,19 @@ void FS_InitGameInfo( gameinfo_t *GameInfo, const char *gamedir )
 	Q_strncpy( GameInfo->sp_entity, "info_player_start", sizeof( GameInfo->sp_entity ));
 	Q_strncpy( GameInfo->mp_entity, "info_player_deathmatch", sizeof( GameInfo->mp_entity ));
 
+#if XASH_PSP
+	// also what a gameinfo.txt regenerated from liblist.gam gets: the PC
+	// defaults below take several MB the PSP doesn't have
+	GameInfo->max_edicts     = 600;
+	GameInfo->max_tents      = 150;
+	GameInfo->max_beams      = 64;
+	GameInfo->max_particles  = 512;
+#else
 	GameInfo->max_edicts     = 900; // default value if not specified
 	GameInfo->max_tents      = 500;
 	GameInfo->max_beams      = 128;
 	GameInfo->max_particles  = 4096;
+#endif
 }
 
 void FS_ParseGenericGameInfo( gameinfo_t *GameInfo, const char *buf, const qboolean isGameInfo )
@@ -1946,7 +1955,12 @@ void FS_ParseGenericGameInfo( gameinfo_t *GameInfo, const char *buf, const qbool
 			else if( !Q_stricmp( token, "max_tempents" ))
 			{
 				pfile = COM_ParseFile( pfile, token );
+#if XASH_PSP
+				// each one holds a whole client entity, gameinfo.txt can go lower
+				GameInfo->max_tents = bound( 100, Q_atoi( token ), 2048 );
+#else
 				GameInfo->max_tents = bound( 300, Q_atoi( token ), 2048 );
+#endif
 			}
 			else if( !Q_stricmp( token, "max_beams" ))
 			{
@@ -1956,7 +1970,11 @@ void FS_ParseGenericGameInfo( gameinfo_t *GameInfo, const char *buf, const qbool
 			else if( !Q_stricmp( token, "max_particles" ))
 			{
 				pfile = COM_ParseFile( pfile, token );
+#if XASH_PSP
+				GameInfo->max_particles = bound( 256, Q_atoi( token ), 32768 );
+#else
 				GameInfo->max_particles = bound( 4096, Q_atoi( token ), 32768 );
+#endif
 			}
 			else if( !Q_stricmp( token, "gamemode" ))
 			{

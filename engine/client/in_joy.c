@@ -392,8 +392,16 @@ void Joy_Init( void )
 {
 	joy_pitch   = Cvar_Get( "joy_pitch",   "100.0", FCVAR_ARCHIVE, "joystick pitch sensitivity" );
 	joy_yaw     = Cvar_Get( "joy_yaw",     "100.0", FCVAR_ARCHIVE, "joystick yaw sensitivity" );
+#if XASH_PSP
+	// the PSP stick comes in as axes 2 (x) and 3 (y), both negated: the
+	// analog stick moves and strafes, the face buttons turn (see the
+	// controls menu)
+	joy_side    = Cvar_Get( "joy_side",    "-1.0", FCVAR_ARCHIVE, "joystick side sensitivity. Values from -1.0 to 1.0" );
+	joy_forward = Cvar_Get( "joy_forward", "-1.0", FCVAR_ARCHIVE, "joystick forward sensitivity. Values from -1.0 to 1.0" );
+#else
 	joy_side    = Cvar_Get( "joy_side",    "1.0", FCVAR_ARCHIVE, "joystick side sensitivity. Values from -1.0 to 1.0" );
 	joy_forward = Cvar_Get( "joy_forward", "1.0", FCVAR_ARCHIVE, "joystick forward sensitivity. Values from -1.0 to 1.0" );
+#endif
 
 	joy_lt_threshold = Cvar_Get( "joy_lt_threshold", "-16384", FCVAR_ARCHIVE, "left trigger threshold. Value from -32768 to 32767");
 	joy_rt_threshold = Cvar_Get( "joy_rt_threshold", "-16384", FCVAR_ARCHIVE, "right trigger threshold. Value from -32768 to 32767" );
@@ -408,7 +416,7 @@ void Joy_Init( void )
 	joy_pitch_deadzone = Cvar_Get( "joy_pitch_deadzone", "0", FCVAR_ARCHIVE, "pitch axis deadzone. Value from 0 to 32767");
 	joy_yaw_deadzone = Cvar_Get( "joy_yaw_deadzone", "0", FCVAR_ARCHIVE, "yaw axis deadzone. Value from 0 to 32767" );
 
-	joy_axis_binding = Cvar_Get( "joy_axis_binding", "sfpyrl", FCVAR_ARCHIVE, "axis hardware id to engine inner axis binding, "
+	joy_axis_binding = Cvar_Get( "joy_axis_binding", XASH_PSP ? "pysf" : "sfpyrl", FCVAR_ARCHIVE, "axis hardware id to engine inner axis binding, "
 		"s - side, f - forward, y - yaw, p - pitch, r - left trigger, l - right trigger" );
 	joy_found   = Cvar_Get( "joy_found", "0", FCVAR_READ_ONLY, "is joystick is connected" );
 	// we doesn't loaded config.cfg yet, so this cvar is not archive.
