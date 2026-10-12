@@ -29,6 +29,8 @@ the Free Software Foundation, either version 3 of the License, or
 
 // upper bound for the bot count slider
 #define MAX_BOTS		15
+// with "Ad-hoc" checked
+#define MAX_BOTS_ADHOC		6
 
 class CMenuCounterStrike;
 
@@ -56,22 +58,12 @@ public:
 class CMenuCounterStrike : public CMenuFramework
 {
 public:
-	CMenuCounterStrike() : CMenuFramework( "CMenuCounterStrike" ), mapsListModel( this ) { m_iFrames = 0; }
+	CMenuCounterStrike() : CMenuFramework( "CMenuCounterStrike" ), mapsListModel( this ) { }
 	static void StartGameCb( CMenuBaseItem *pSelf, void *pExtra );
 	static void ToggleBotsCb( CMenuBaseItem *pSelf, void *pExtra );
 
 	CMenuTable	mapsList;
 	CMenuCSMapListModel mapsListModel;
-	int m_iFrames;
-
-	void Draw() override
-	{
-		// first few frames only, this is a liveness probe
-		if( m_iFrames < 3 )
-			Con_Printf( "S_PSP: CS menu Draw frame %d\n", m_iFrames );
-		m_iFrames++;
-		CMenuFramework::Draw();
-	}
 
 	// bot count, zero means "no bots" which is how the original menu
 	// expresses it too: the checkbox off is just a zero count
@@ -85,6 +77,19 @@ public:
 	// host over ad-hoc: one more player slot, another PSP joins with the
 	// main menu's "Join Ad-hoc"
 	CMenuCheckBox adhoc;
+
+	// the hosting PSP runs the server, the bots and its own game: with
+	// another player connected 6 bots (4 vs 4) is about what it carries
+	int MaxBots() const { return adhoc.bChecked ? MAX_BOTS_ADHOC : MAX_BOTS; }
+	void ApplyBotLimit()
+	{
+		botCount.Setup( 0, MaxBots(), 1.0f );
+		if( botCount.GetCurrentValue() > MaxBots())
+		{
+			botCount.SetCurrentValue( MaxBots());
+			botCount.WriteCvar(); // the server reads the count from cs_menu_botcount
+		}
+	}
 
 	CMenuPicButton *done;
 	CMenuPicButton *botsToggle;
@@ -109,7 +114,7 @@ void CMenuCounterStrike::ToggleBotsCb( CMenuBaseItem *pSelf, void *pExtra )
 	float value = menu->botCount.GetCurrentValue() + (pExtra ? 1.0f : -1.0f);
 
 	if( value < 0 ) value = 0;
-	if( value > MAX_BOTS ) value = MAX_BOTS;
+	if( value > menu->MaxBots()) value = menu->MaxBots();
 
 	menu->botCount.SetCurrentValue( value );
 	menu->botCount.WriteCvar();
@@ -190,7 +195,6 @@ void CMenuCSMapListModel::Update( void )
 	m_iNumItems = numMaps;
 	EngFuncs::COM_FreeFile( afile );
 	uiStatic.needMapListUpdate = false;
-	Con_Printf( "S_PSP: map list ready, %d maps\n", numMaps );
 }
 
 /*
@@ -221,6 +225,7 @@ void CMenuCounterStrike::StartGameCb( CMenuBaseItem *pSelf, void *pExtra )
 			EngFuncs::HostEndGame( "starting new server" );
 	}
 
+	menu->ApplyBotLimit();
 	int bots = (int)menu->botCount.GetCurrentValue();
 	// leave room for the human player. Never 1: with maxplayers 1 the engine
 	// forces deathmatch 0 and the game library installs the training rules
@@ -264,7 +269,6 @@ void CMenuCounterStrike::_Init( void )
 {
 	uiStatic.needMapListUpdate = true;
 
-	Con_Printf( "S_PSP: CMenuCounterStrike::_Init enter\n" );
 
 	// register before linking, otherwise WriteCvar() finds nothing
 	EngFuncs::CvarRegister( "cs_menu_botcount", "0", FCVAR_ARCHIVE );
@@ -301,7 +305,8 @@ void CMenuCounterStrike::_Init( void )
 	SET_EVENT( diffMedium.onChanged, ((CMenuCounterStrike *)pSelf->Parent())->SetDifficulty( 1 ));
 	AddItem( diffMedium );
 
-	adhoc.SetNameAndStatus( "Ad-hoc", "Let another PSP join this game (Join Ad-hoc in its main menu)" );
+	adhoc.SetNameAndStatus( "Ad-hoc", "Let another PSP join this game (Join Ad-hoc in its main menu). Up to 6 bots" );
+	SET_EVENT( adhoc.onChanged, ((CMenuCounterStrike *)pSelf->Parent())->ApplyBotLimit() );
 	AddItem( adhoc );
 
 	// Both controls need an explicit rect, the framework only places the
@@ -323,7 +328,6 @@ void CMenuCounterStrike::_Init( void )
 
 void CMenuCounterStrike::_VidInit( void )
 {
-	Con_Printf( "S_PSP: CMenuCounterStrike::_VidInit enter\n" );
 	uiStatic.needMapListUpdate = true;
 	SetDifficulty( (int)EngFuncs::GetCvarFloat( "cs_menu_botdiff" ));
 }

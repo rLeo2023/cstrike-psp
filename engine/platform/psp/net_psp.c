@@ -59,7 +59,6 @@ int psp_net_errno;
 static qboolean		adhoc_active;
 static qboolean		adhoc_libsready;	// modules loaded, net/adhoc/adhocctl initialized
 static qboolean		adhoc_joiner;	// joined someone else's game: no server port
-static int		adhoc_logsent, adhoc_logrecv;	// first packets go to the log
 static byte		adhoc_mac[6];
 static adhoc_socket_t	adhoc_sockets[ADHOC_MAX_SOCKETS];
 static adhoc_peer_t	adhoc_peers[ADHOC_MAX_PEERS];
@@ -228,7 +227,6 @@ int PSP_NetBind( int s, const struct sockaddr *addr )
 
 	sock->pdp = pdp;
 	sock->port = port;
-	Con_Printf( "S_PSP: adhoc socket on port %i\n", port );
 	return 0;
 }
 
@@ -270,12 +268,6 @@ int PSP_NetSendTo( int s, const void *buf, int len, const struct sockaddr *to )
 		return -1;
 	}
 
-	if( adhoc_logsent++ < 12 )
-	{
-		const byte *ip = (const byte *)&sin->sin_addr.s_addr;
-		Con_Printf( "S_PSP: adhoc sent %i bytes from port %i to %i.%i.%i.%i:%i\n",
-			len, sock->port, ip[0], ip[1], ip[2], ip[3], ntohs( sin->sin_port ));
-	}
 
 	return len;
 }
@@ -327,12 +319,6 @@ int PSP_NetRecvFrom( int s, void *buf, int len, struct sockaddr *from )
 	sin->sin_port = htons( port );
 	Adhoc_MacToIp( mac, (byte *)&sin->sin_addr.s_addr );
 
-	if( adhoc_logrecv++ < 12 )
-	{
-		const byte *ip = (const byte *)&sin->sin_addr.s_addr;
-		Con_Printf( "S_PSP: adhoc received %i bytes on port %i from %i.%i.%i.%i:%i\n",
-			size, sock->port, ip[0], ip[1], ip[2], ip[3], port );
-	}
 
 	return size;
 }

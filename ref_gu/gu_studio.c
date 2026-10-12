@@ -3227,6 +3227,20 @@ static void R_StudioSetupRenderer( int rendermode )
 	if( rendermode > kRenderTransAdd ) rendermode = 0;
 	g_studio.rendermode = bound( 0, rendermode, kRenderTransAdd );
 
+	// The CS client toggles cl_righthand around the knife and shield view
+	// models, which are never mirrored, after R_DrawViewModel picked the
+	// winding from it: pick it again here, otherwise the shield is drawn
+	// with its back faces only and looks see-through. Here and not in
+	// R_StudioRenderFinal: the client has its own render-final, it calls
+	// this one (IEngineStudio.SetupRenderer) for every pass
+	if( RI.currententity == gEngfuncs.GetViewModel() )
+	{
+		qboolean	flip = R_AllowFlipViewModel( RI.currententity ) || g_iBackFaceCull;
+
+		tr.fFlipViewModel = flip;
+		GL_Cull( flip ? GL_BACK : GL_FRONT );
+	}
+
 	sceGuTexFunc(GU_TFX_MODULATE , GU_TCC_RGBA);
 	sceGuDisable( GU_ALPHA_TEST );
 	sceGuShadeModel( GU_SMOOTH );
@@ -3425,18 +3439,6 @@ StudioRenderFinal
 void R_StudioRenderFinal( void )
 {
 	int	i, rendermode;
-
-	// The CS client toggles cl_righthand around the knife and shield view
-	// models, which are never mirrored, after R_DrawViewModel picked the
-	// winding from it: pick it again now, otherwise the shield is drawn
-	// with its back faces only and looks see-through
-	if( RI.currententity == gEngfuncs.GetViewModel() )
-	{
-		qboolean	flip = R_AllowFlipViewModel( RI.currententity ) || g_iBackFaceCull;
-
-		tr.fFlipViewModel = flip;
-		GL_Cull( flip ? GL_BACK : GL_FRONT );
-	}
 
 	rendermode = R_StudioGetForceFaceFlags() ? kRenderTransAdd : RI.currententity->curstate.rendermode;
 	R_StudioSetupRenderer( rendermode );

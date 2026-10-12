@@ -105,7 +105,6 @@ qboolean SNDDMA_Init( void )
 		samplecount = 0x4000;
 
 	// each step is logged: PPSSPP on Android stopped somewhere in here
-	Con_Printf( "S_PSP: audio init: buffer\n" );
 	dma.samples         = samplecount * PSP_OUTPUT_CHANNELS;
 	dma.samplepos       = 0;
 	dma.buffer          = memalign( 64, dma.samples * 2 ); // 16 bit
@@ -117,7 +116,6 @@ qboolean SNDDMA_Init( void )
 	memset( snd_psp_buff, 0, sizeof( snd_psp_buff ));
 
 	// allocate and initialize a hardware output channel
-	Con_Printf( "S_PSP: audio init: channel\n" );
 	snd_psp.channel = sceAudioChReserve( PSP_AUDIO_NEXT_CHANNEL,
 		PSP_NUM_AUDIO_SAMPLES, PSP_AUDIO_FORMAT_STEREO );
 	if( snd_psp.channel < 0 )
@@ -128,7 +126,6 @@ qboolean SNDDMA_Init( void )
 	}
 
 	// create semaphore
-	Con_Printf( "S_PSP: audio init: semaphore\n" );
 	snd_psp.semaUID = sceKernelCreateSema( "sound_sema", 0, 1, 255, NULL );
 	if( snd_psp.semaUID <= 0 )
 	{
@@ -137,7 +134,6 @@ qboolean SNDDMA_Init( void )
 	}
 
 	// create audio thread
-	Con_Printf( "S_PSP: audio init: thread\n" );
 	snd_psp.threadUID = sceKernelCreateThread( "sound_thread", SNDDMA_MainThread, 0x12, 0x8000, 0, 0 );
 	if( snd_psp.threadUID < 0 )
 	{
@@ -146,7 +142,6 @@ qboolean SNDDMA_Init( void )
 	}
 
 	// start audio thread
-	Con_Printf( "S_PSP: audio init: start thread\n" );
 	if( sceKernelStartThread( snd_psp.threadUID, 0, 0 ) < 0 )
 	{
 		SNDDMA_Shutdown();

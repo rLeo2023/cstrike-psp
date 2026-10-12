@@ -332,6 +332,14 @@ void CCSBotManager::AddServerCommands()
 void CCSBotManager::ServerDeactivate()
 {
 	m_bServerActive = false;
+
+#ifdef __PSP__
+	// the next map's navigation mesh is loaded after its BSP: freeing this
+	// one now keeps them from being in memory together
+	DestroyNavigationMap();
+	m_isMapDataLoaded = false;
+	m_zoneCount = 0;
+#endif
 }
 
 void CCSBotManager::ClientDisconnect(CBasePlayer *pPlayer)

@@ -399,6 +399,38 @@ void S_InitSounds( void )
 	s_numSfx = 1;
 }
 
+#if XASH_PSP
+/*
+=================
+S_PurgeSoundData
+
+PSP, on disconnect: sounds load the first time they play, so during a game
+their buffers end up spread all over the heap, and the next map has to
+load around them. Freeing them before it loads leaves the heap in one
+piece. The entries stay, a sound that plays again just loads again.
+=================
+*/
+void S_PurgeSoundData( void )
+{
+	sfx_t	*sfx;
+	int	i;
+
+	if( !dma.initialized )
+		return;
+
+	S_StopAllSounds( true );
+
+	for( i = 0, sfx = s_knownSfx; i < s_numSfx; i++, sfx++ )
+	{
+		if( !sfx->name[0] || !sfx->cache || !Q_stricmp( sfx->name, "*default" ))
+			continue;
+
+		FS_FreeSound( sfx->cache );
+		sfx->cache = NULL;
+	}
+}
+#endif
+
 /*
 =================
 S_FreeSounds

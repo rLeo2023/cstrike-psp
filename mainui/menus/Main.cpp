@@ -252,7 +252,6 @@ void CMenuMain::_Init( void )
 	counterStrike.SetPicture( PC_NEW_GAME );
 	counterStrike.iFlags |= QMF_NOTIFY;
 	counterStrike.onReleased = UI_CounterStrike_Menu;
-	Con_Printf( "S_PSP: Counter-Strike menu button installed\n" );
 
 	// searching blocks for a few seconds (joining the ad-hoc group, then
 	// waiting for a host to answer), the connection screen follows

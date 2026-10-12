@@ -216,16 +216,14 @@ void CL_CheckClientState( void )
 	}
 
 #if XASH_PSP
-	// sounds, decals and corpses load while playing: a second report once
-	// the round is going, with the pools and textures (first map only)
+	// sounds, decals and corpses load while playing: a second line once the
+	// round is going (an out of memory error still logs pools and textures)
 	if( psp_reportTime && cls.state == ca_active && host.realtime > psp_reportTime )
 	{
 		void PSP_LogHeapUsage( const char *when );
-		void Mem_PrintReport( void );
 
 		psp_reportTime = 0;
 		PSP_LogHeapUsage( va( "90 s into %s", clgame.mapname ));
-		Mem_PrintReport();
 	}
 #endif
 }
@@ -1534,6 +1532,24 @@ void CL_Disconnect( void )
 
 	S_StopBackgroundTrack ();
 	SCR_EndLoadingPlaque (); // get rid of loading plaque
+
+#if XASH_PSP
+	{
+		// leave the heap in one piece for the next map (see S_PurgeSoundData)
+		void S_PurgeSoundData( void );
+		void PSP_LogHeapUsage( const char *when );
+
+		S_PurgeSoundData();
+
+		// a listen server frees the models in SV_Shutdown, right after
+		// this; a PSP that joined someone's game has to do it here
+		if( !SV_Active( ))
+		{
+			Mod_FreeAll();
+			PSP_LogHeapUsage( "after disconnect" );
+		}
+	}
+#endif
 
 	// clear the network channel, too.
 	Netchan_Clear( &cls.netchan );

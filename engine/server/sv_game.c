@@ -5037,6 +5037,17 @@ qboolean SV_LoadProgs( const char *name )
 	static playermove_t		gpMove;
 	edict_t			*e;
 
+#if XASH_PSP
+	// still loaded from the previous game (SV_Shutdown keeps it, see
+	// there): the level was deactivated, edicts and strings are free
+	if( svgame.hInstance )
+	{
+		svgame.globals->maxClients = svs.maxclients;
+		svgame.numEntities = svs.maxclients + 1; // clients + world
+		return true;
+	}
+#endif
+
 	if( svgame.hInstance ) SV_UnloadProgs();
 
 	// fill it in

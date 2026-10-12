@@ -1061,7 +1061,18 @@ void SV_Shutdown( const char *finalmsg )
 		Master_Shutdown();
 
 	NET_Config( false );
+#if XASH_PSP
+	// The game library is linked into the executable and can't really be
+	// unloaded: its globals survive while SV_UnloadProgs wipes everything
+	// the engine knew about it (messages, cvars, callbacks), and the next
+	// game crashed on the mismatch. End the level the way a map change
+	// does instead, the library stays loaded and SV_LoadProgs reuses it.
+	// It also frees the level data (the bots' navigation mesh, ~2 MB) now,
+	// rather than while the next map loads around it.
+	SV_DeactivateServer();
+#else
 	SV_UnloadProgs ();
+#endif
 	CL_Drop();
 
 	// free current level
@@ -1072,6 +1083,13 @@ void SV_Shutdown( const char *finalmsg )
 
 	// release all models
 	Mod_FreeAll();
+
+#if XASH_PSP
+	{
+		void PSP_LogHeapUsage( const char *when );
+		PSP_LogHeapUsage( "after disconnect" );
+	}
+#endif
 
 	HPAK_FlushHostQueue();
 	Log_Printf( "Server shutdown\n" );

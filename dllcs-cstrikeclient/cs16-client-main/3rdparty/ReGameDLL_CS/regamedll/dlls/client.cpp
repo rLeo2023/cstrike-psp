@@ -142,8 +142,16 @@ unsigned short g_iShadowSprite;
 
 void LinkUserMessages()
 {
+#ifndef __PSP__
 	if (gmsgCurWeapon)
 		return;
+#else
+	// The game library is linked into the executable: "unloading" it on
+	// disconnect clears the engine's message table but not these globals,
+	// so the second map sent every message unregistered (SV_Multicast
+	// "expected 0 bytes", then a crash). Register again each time, the
+	// engine returns the same number for a name it already knows
+#endif
 
 	gmsgCurWeapon     = REG_USER_MSG("CurWeapon", 3);
 	gmsgGeigerRange   = REG_USER_MSG("Geiger", 1);

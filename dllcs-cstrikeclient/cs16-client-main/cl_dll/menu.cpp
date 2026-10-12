@@ -218,8 +218,19 @@ int CHudMenu :: Draw( float flTime )
 			nlc++;
 	}
 
+#ifdef __PSP__
+	// The stock centering assumes 12 pixel lines but draws 24 apart, so on
+	// the short PSP screen long menus ran off the bottom ("0. Exit" of the
+	// buy menu was out of sight): tighter lines, centered on their real
+	// height, never above the top
+	const int lineHeight = 18;
+	int y = ( ScreenHeight - ( nlc + 1 ) * lineHeight ) / 2;
+	if( y < 4 ) y = 4;
+#else
 	// center it
 	int y = (ScreenHeight/2) - ((nlc/2)*12) - 40; // make sure it is above the say text
+	const int lineHeight = 24;
+#endif
 	int x = 20;
 
 	i = 0;
@@ -230,7 +241,7 @@ int CHudMenu :: Draw( float flTime )
 			DrawUtils::DrawHudString( x - 14, y, 320, ">", 255, 210, 64 );
 #endif
 		DrawUtils::DrawHudString( x, y, 320, g_szMenuString + i, 255, 255, 255 );
-		y += 24;
+		y += lineHeight;
 
 		while ( i < MAX_MENU_STRING && g_szMenuString[i] != '\0' && g_szMenuString[i] != '\n' )
 			i++;
