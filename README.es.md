@@ -4,7 +4,7 @@
 
 Port de Counter-Strike 1.6 a la PSP sobre el motor [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs),
 partiendo del port de PSP de [Crow-bar](https://github.com/Crow-bar/xash3d-fwgs).
-Se juega contra bots en servidor local, hasta 5 contra 5, y anda en PSP y en PPSSPP.
+Se juega contra bots, hasta 5 contra 5, solo o con un amigo por ad-hoc, y anda en PSP y en PPSSPP.
 
 Este repositorio contiene **solo código y configuración**. No incluye ningún archivo del juego
 (mapas, modelos, sonidos, texturas): hace falta una copia legal de Counter-Strike 1.6.
@@ -60,16 +60,28 @@ El resultado queda en `build/engine/EBOOT.PBP` y `build/engine/xash.prx`.
 |---|---|
 | Analógico | Moverse |
 | △ / ✕ / □ / ○ | Mirar arriba / abajo / izquierda / derecha |
-| Cruceta ↑ / ↓ | Saltar / agacharse |
+| Cruceta ↑ / ↓ | Saltar / agacharse (un toque y quedás agachado, otro y te parás) |
 | Cruceta ← / → | Siguiente arma / usar y recargar |
 | R / L | Disparar / ataque secundario |
-| SELECT | Menú de compra (incluye "9. Autobuy", según `autobuy.txt`) |
+| SELECT (toque corto) | Menú de compra (incluye "9. Autobuy", según `autobuy.txt`) |
+| SELECT + ← / ✕ / □ / ○ / R | Tirar arma / última arma / granadas / cambiar de equipo / cuchillo |
 | START | Menú |
 
 En los menús de texto: cruceta ↑/↓ mueve el cursor, ✕ elige, ○ cierra.
 Los botones se cambian en `cstrike/userconfig.cfg`. La velocidad de cámara, invertir la vista, la
 velocidad y zona muerta del analógico, la ayuda de apuntado y la mira están en Options → Controls.
 La configuración se guarda al salir de cada página de opciones y con Options → Save settings.
+
+## Multijugador ad-hoc
+
+Dos PSP juegan la misma partida (con los bots de quien la crea):
+
+1. El que crea: Counter-Strike, marcar **Ad-hoc**, elegir mapa y hasta 6 bots, Start Game.
+2. La otra PSP: **Join Ad-hoc** en el menú principal. Busca la partida y se conecta.
+
+En PPSSPP, para probarlo con dos instancias en la misma PC: Ajustes → Red, activar redes, dirección
+del servidor ad-hoc `127.0.0.1`, relé de paquetes desactivado, una MAC distinta en cada instancia y
+el servidor PRO ad-hoc integrado activado solo en una de las dos.
 
 ## Cambios principales respecto de los proyectos originales
 
@@ -88,12 +100,16 @@ La configuración se guarda al salir de cada página de opciones y con Options �
   apuntado, página de controles para PSP, configuración que se guarda en el momento, textos de ayuda
   traducidos, recargas arregladas (el servidor se compila con `CLIENT_WEAPONS`), título del EBOOT
   "Counter-Strike".
+- **Ad-hoc**: los sockets del motor funcionan sobre el ad-hoc de la PSP (PDP), con direcciones armadas
+  a partir de la MAC (`engine/platform/psp/net_psp.c`); crear y unirse desde los menús.
+- **Cambio de mapa**: desconectar termina el nivel como un cambio de mapa (la librería del juego está
+  dentro del ejecutable y queda cargada) y libera los datos del nivel, así se puede jugar otro mapa
+  sin reiniciar el juego.
 
 ## Problemas conocidos
 
-- Cambiar de mapa después de jugar uno puede quedarse sin memoria por fragmentación del heap.
-  Reiniciar el juego antes de cambiar de mapa.
-- Mapas grandes pueden no entrar en memoria.
+- Mapas grandes pueden no entrar en memoria, sobre todo como segundo o tercer mapa de la sesión.
+- El ad-hoc está probado en PPSSPP; se agradecen pruebas en PSP reales.
 - Con muchos bots (4v4, 5v5) bajan los fps en los momentos con mucha acción.
 
 ## Créditos y licencias

@@ -4,7 +4,7 @@
 
 A port of Counter-Strike 1.6 to the PSP, built on the [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs)
 engine and based on [Crow-bar's](https://github.com/Crow-bar/xash3d-fwgs) PSP port.
-You play against bots on a local server, up to 5 vs 5. It runs on real PSP hardware and on PPSSPP.
+You play against bots, up to 5 vs 5, alone or with a friend over ad-hoc. It runs on real PSP hardware and on PPSSPP.
 
 This repository contains **code and configuration only**. It does not include any game files
 (maps, models, sounds, textures): you need a legal copy of Counter-Strike 1.6.
@@ -60,16 +60,28 @@ The output is `build/engine/EBOOT.PBP` and `build/engine/xash.prx`.
 |---|---|
 | Analog stick | Move |
 | △ / ✕ / □ / ○ | Look up / down / left / right |
-| D-pad ↑ / ↓ | Jump / crouch |
+| D-pad ↑ / ↓ | Jump / crouch (press once to stay down, again to stand up) |
 | D-pad ← / → | Next weapon / use and reload |
 | R / L | Fire / secondary attack |
-| SELECT | Buy menu (includes "9. Autobuy", from `autobuy.txt`) |
+| SELECT (short press) | Buy menu (includes "9. Autobuy", from `autobuy.txt`) |
+| SELECT + ← / ✕ / □ / ○ / R | Drop weapon / last weapon / grenades / change team / knife |
 | START | Menu |
 
 In text menus: D-pad ↑/↓ moves the cursor, ✕ selects, ○ closes.
 The buttons are set in `cstrike/userconfig.cfg`. Look speed, invert look, analog stick speed and
 deadzone, aim assist and crosshair are in Options → Controls. Settings are saved when you leave a
 settings page and with Options → Save settings.
+
+## Ad-hoc multiplayer
+
+Two PSPs play the same game (the host's bots included):
+
+1. Host: Counter-Strike, check **Ad-hoc**, pick the map and up to 6 bots, Start Game.
+2. The other PSP: **Join Ad-hoc** in the main menu. It finds the game and connects.
+
+On PPSSPP, to try it with two instances on one PC: Settings → Networking, enable networking, set the
+ad-hoc server address to `127.0.0.1`, turn the packet relay off, give each instance a different MAC
+address, and enable the built-in PRO ad-hoc server on one of them only.
 
 ## Main changes from the original projects
 
@@ -86,12 +98,16 @@ settings page and with Options → Save settings.
   game menu with map, number of bots and bot difficulty (Easy / Medium), client-side aim assist,
   PSP controls page, settings saved on the spot, localized hint texts, fixed magazine reloads
   (the server is built with `CLIENT_WEAPONS`), EBOOT titled "Counter-Strike".
+- **Ad-hoc**: the engine's sockets run over PSP ad-hoc (PDP) with addresses made up from the MAC
+  (`engine/platform/psp/net_psp.c`); host and join from the menus.
+- **Map changes**: disconnecting ends the level like a map change (the game library is linked into
+  the executable and stays loaded) and frees the level data, so another map can be started without
+  restarting the game.
 
 ## Known issues
 
-- Changing maps after playing one can run out of memory because of heap fragmentation.
-  Restart the game before switching maps.
-- Large maps may not fit in memory.
+- Large maps may not fit in memory, especially as the second or third map of a session.
+- Ad-hoc has been tested on PPSSPP; tests on real PSPs are welcome.
 - With many bots (4v4, 5v5) the frame rate drops in busy moments.
 
 ## Credits and licenses
