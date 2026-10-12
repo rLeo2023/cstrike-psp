@@ -646,6 +646,12 @@ void Host_Frame( float time )
 		return;
 
 	Host_InputFrame ();  // input frame
+#if XASH_PSP
+	{
+		void PSP_NetFrame( void );
+		PSP_NetFrame(); // ad-hoc join, one step per frame
+	}
+#endif
 	Host_ClientBegin (); // begin client
 	Host_GetCommands (); // dedicated in
 	Host_ServerFrame (); // server frame

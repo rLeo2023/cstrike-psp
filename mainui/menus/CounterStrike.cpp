@@ -82,6 +82,10 @@ public:
 	CMenuCheckBox diffEasy, diffMedium;
 	void SetDifficulty( int diff );
 
+	// host over ad-hoc: one more player slot, another PSP joins with the
+	// main menu's "Join Ad-hoc"
+	CMenuCheckBox adhoc;
+
 	CMenuPicButton *done;
 	CMenuPicButton *botsToggle;
 
@@ -222,6 +226,9 @@ void CMenuCounterStrike::StartGameCb( CMenuBaseItem *pSelf, void *pExtra )
 	// forces deathmatch 0 and the game library installs the training rules
 	// (tr_ maps: no teams, looks for info_player_start and finds none).
 	int players = bots + 1;
+	bool adhoc = menu->adhoc.bChecked;
+	if( adhoc )
+		players++;	// the PSP that joins
 	if( players < 2 )
 		players = 2;
 
@@ -241,8 +248,10 @@ void CMenuCounterStrike::StartGameCb( CMenuBaseItem *pSelf, void *pExtra )
 	// bot_quota/bot_difficulty are registered by the game library, which is
 	// only loaded by "map", so they have to come after it in the buffer.
 	char cmd[1024];
-	sprintf( cmd, "endgame;menu_connectionprogress localserver;wait;wait;wait;maxplayers %i;latch;map %s;bot_difficulty %i;bot_quota %i\n",
-		players, cmd2, (int)EngFuncs::GetCvarFloat( "cs_menu_botdiff" ), bots );
+	// adhoc_host joins the ad-hoc group first (blocks a few seconds), the
+	// listen server then opens its port over ad-hoc
+	sprintf( cmd, "%sendgame;menu_connectionprogress localserver;wait;wait;wait;maxplayers %i;latch;map %s;bot_difficulty %i;bot_quota %i\n",
+		adhoc ? "adhoc_host;" : "", players, cmd2, (int)EngFuncs::GetCvarFloat( "cs_menu_botdiff" ), bots );
 	EngFuncs::ClientCmd( FALSE, cmd );
 }
 
@@ -292,6 +301,9 @@ void CMenuCounterStrike::_Init( void )
 	SET_EVENT( diffMedium.onChanged, ((CMenuCounterStrike *)pSelf->Parent())->SetDifficulty( 1 ));
 	AddItem( diffMedium );
 
+	adhoc.SetNameAndStatus( "Ad-hoc", "Let another PSP join this game (Join Ad-hoc in its main menu)" );
+	AddItem( adhoc );
+
 	// Both controls need an explicit rect, the framework only places the
 	// AddButton ones. Units are MainUI's virtual 1024x768 space; on PSP the
 	// scale is 272/768 (~0.35), so the visible width is ~1355 units.
@@ -302,6 +314,7 @@ void CMenuCounterStrike::_Init( void )
 	botCount.SetRect( 72, 380, 230, 30 );
 	diffEasy.SetCoord( 72, 450 );
 	diffMedium.SetCoord( 72, 510 );
+	adhoc.SetCoord( 72, 590 );
 
 	msgBox.SetMessage( "Start the selected map?" );
 	msgBox.HighlightChoice( CMenuYesNoMessageBox::HIGHLIGHT_YES );

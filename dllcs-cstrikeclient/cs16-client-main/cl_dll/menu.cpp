@@ -137,11 +137,11 @@ bool CHudMenu::HandleMenuKey( int keynum )
 		return true;
 	case K_B_BUTTON: // circle
 	case K_SPACE:
-		// "0. Exit/Cancel" when the menu has one, close it otherwise
+		// "0. Exit/Cancel" when the menu has one. Menus without it (team
+		// and class selection) are a choice the server waits for: hiding
+		// them left the player stuck with no menu, so they stay open
 		if( m_bitsValidSlots & ( 1 << 9 ))
 			SelectMenuItem( 10 );
-		else
-			UserCmd_OldStyleMenuClose();
 		return true;
 	}
 

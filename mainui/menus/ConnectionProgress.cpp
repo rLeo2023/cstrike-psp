@@ -188,9 +188,13 @@ void CMenuConnectionProgress::HandleDisconnect( void )
 			UI_CloseMenu();
 			UI_SetActiveMenu( true );
 			UI_Main_Menu();
+#ifndef MAINUI_PSP
+			// PSP: games start from the Counter-Strike menu or Join Ad-hoc,
+			// both on the main menu
 			UI_ServerBrowser_Menu();
 			if( m_iSource == SOURCE_CREATEGAME )
 				UI_CreateGame_Menu();
+#endif
 			if( m_iState == STATE_DOWNLOAD )
 			{
 				Show();

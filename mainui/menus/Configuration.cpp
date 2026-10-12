@@ -73,8 +73,15 @@ void CMenuOptions::_Init( void )
 #endif
 	AddButton( L( "GameUI_Audio" ), L( "Change sound volume and quality" ),
 		PC_AUDIO, UI_Audio_Menu, QMF_NOTIFY );
+#ifdef MAINUI_PSP
+	// the Video page only held a "Video options" button (no video modes
+	// on PSP): open the options directly
+	AddButton( L( "GameUI_Video" ), L( "Change screen size, gamma and image quality" ),
+		PC_VIDEO, UI_VidOptions_Menu, QMF_NOTIFY );
+#else
 	AddButton( L( "GameUI_Video" ), L( "Change screen size, video mode and gamma" ),
 		PC_VIDEO, UI_Video_Menu, QMF_NOTIFY );
+#endif
 	if( UI_IsXashFWGS() )
 	{
 #ifndef MAINUI_PSP

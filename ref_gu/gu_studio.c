@@ -3426,6 +3426,18 @@ void R_StudioRenderFinal( void )
 {
 	int	i, rendermode;
 
+	// The CS client toggles cl_righthand around the knife and shield view
+	// models, which are never mirrored, after R_DrawViewModel picked the
+	// winding from it: pick it again now, otherwise the shield is drawn
+	// with its back faces only and looks see-through
+	if( RI.currententity == gEngfuncs.GetViewModel() )
+	{
+		qboolean	flip = R_AllowFlipViewModel( RI.currententity ) || g_iBackFaceCull;
+
+		tr.fFlipViewModel = flip;
+		GL_Cull( flip ? GL_BACK : GL_FRONT );
+	}
+
 	rendermode = R_StudioGetForceFaceFlags() ? kRenderTransAdd : RI.currententity->curstate.rendermode;
 	R_StudioSetupRenderer( rendermode );
 
@@ -4079,12 +4091,10 @@ void R_DrawViewModel( void )
 	sceGuDepthRange( ( int )gldepthmin, ( int )gldepthmax );
 	R_LoadViewModelProjection( false );
 
-	// backface culling for left-handed weapons
-	if( m_flip || g_iBackFaceCull )
-	{
-		tr.fFlipViewModel = false;
-		GL_Cull( GL_FRONT );
-	}
+	// back to the world's winding. Unconditionally: R_StudioRenderFinal may
+	// have flipped it even when m_flip is off (knife/shield with cl_righthand 0)
+	tr.fFlipViewModel = false;
+	GL_Cull( GL_FRONT );
 }
 
 /*

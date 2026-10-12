@@ -38,7 +38,12 @@ CVAR_DEFINE_AUTO( cl_allow_upload, "1", FCVAR_ARCHIVE, "allow to uploading resou
 CVAR_DEFINE_AUTO( cl_download_ingame, "1", FCVAR_ARCHIVE, "allow to downloading resources while client is active" );
 CVAR_DEFINE_AUTO( cl_logofile, "lambda", FCVAR_ARCHIVE, "player logo name" );
 CVAR_DEFINE_AUTO( cl_logocolor, "orange", FCVAR_ARCHIVE, "player logo color" );
+#if XASH_PSP
+// the test is a 64000 byte answer, more than an ad-hoc datagram carries
+CVAR_DEFINE_AUTO( cl_test_bandwidth, "0", 0, "test network bandwith before connection" );
+#else
 CVAR_DEFINE_AUTO( cl_test_bandwidth, "1", FCVAR_ARCHIVE, "test network bandwith before connection" );
+#endif
 convar_t	*rcon_client_password;
 convar_t	*rcon_address;
 convar_t	*cl_timeout;
@@ -1186,6 +1191,10 @@ void CL_CheckForResend( void )
 	cls.connect_retry++;
 
 	Con_Printf( "Connecting to %s... [retry #%i]\n", cls.servername, cls.connect_retry );
+#if XASH_PSP
+	// on the connection screen too, the console isn't visible there
+	Cbuf_AddText( va( "menu_connectionprogress stufftext 0.85 \"Connecting to %s, try %i...\"\n", cls.servername, cls.connect_retry ));
+#endif
 
 	if( !cls.legacymode && cl_test_bandwidth.value )
 		Netchan_OutOfBandPrint( NS_CLIENT, adr, "bandwidth %i %i\n", PROTOCOL_VERSION, cls.max_fragment_size );

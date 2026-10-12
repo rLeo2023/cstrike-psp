@@ -94,7 +94,11 @@ static int ioctl_stub( int d, unsigned long r, ... )
 typedef int WSAsize_t;
 #else
 #include <errno.h> // @Crow-bar
+#if XASH_PSP
+#include "platform/psp/net_psp.h" // sockets over ad-hoc
+#else
 #include "platform/stub/net_stub.h"
+#endif
 #endif
 
 #define NET_USE_FRAGMENTS
@@ -1742,6 +1746,13 @@ void NET_Init( void )
 	net.sequence_number = 1;
 	net.initialized = true;
 	Con_Reportf( "Base networking initialized.\n" );
+
+#if XASH_PSP
+	{
+		void PSP_NetInit( void );
+		PSP_NetInit(); // adhoc_host / adhoc_join
+	}
+#endif
 }
 
 

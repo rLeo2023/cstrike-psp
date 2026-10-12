@@ -377,6 +377,8 @@ class PSP:
 		stdlibs += ['-lpspdisplay', '-lpspgum_vfpu', '-lpspgu','-lpspge', '-lpspvfpu']
 		stdlibs += ['-lpspaudio', '-lpspdmac']
 		stdlibs += ['-lstdc++', '-lc', '-lm']
+		# ad-hoc multiplayer (engine/platform/psp/net_psp.c)
+		stdlibs += ['-lpspnet_adhocctl', '-lpspnet_adhoc', '-lpspnet', '-lpspwlan']
 		stdlibs += ['-lpspctrl', '-lpspdebug', '-lpsppower', '-lpsputility',  '-lpspsdk', '-lpsprtc']
 		stdlibs += ['-lpspuser', '-lpspkernel']
 		return stdlibs

@@ -71,6 +71,8 @@ private:
 #ifdef MAINUI_PSP
 	// Counter-Strike: the new game entry point, same slot as Quake's
 	CMenuPicButton	counterStrike;
+	// joins a game another PSP hosts over ad-hoc (engine "adhoc_join")
+	CMenuPicButton	joinAdhoc;
 #endif
 	CMenuPicButton	hazardCourse;
 	CMenuPicButton	configuration;
@@ -251,6 +253,13 @@ void CMenuMain::_Init( void )
 	counterStrike.iFlags |= QMF_NOTIFY;
 	counterStrike.onReleased = UI_CounterStrike_Menu;
 	Con_Printf( "S_PSP: Counter-Strike menu button installed\n" );
+
+	// searching blocks for a few seconds (joining the ad-hoc group, then
+	// waiting for a host to answer), the connection screen follows
+	joinAdhoc.SetNameAndStatus( L( "Join Ad-hoc" ), L( "Join a game hosted by another PSP nearby" ) );
+	joinAdhoc.SetPicture( PC_JOIN_GAME );
+	joinAdhoc.iFlags |= QMF_NOTIFY;
+	joinAdhoc.onReleased.SetCommand( FALSE, "adhoc_join\n" );
 #endif
 
 	hazardCourse.SetNameAndStatus( L( "GameUI_TrainingRoom" ), L( "StringsList_190" ) );
@@ -336,6 +345,7 @@ void CMenuMain::_Init( void )
 	// CS has no single player, so this replaces "new game" rather than
 	// sitting next to it
 	AddItem( counterStrike );
+	AddItem( joinAdhoc );
 #else
 	AddItem( newGame );
 #endif
@@ -416,9 +426,10 @@ void CMenuMain::VidInit( bool connected )
 	console.CalcPosition();
 	saveRestore.SetCoord( 72, bTrainMap ? 380 : 330 );
 #ifdef MAINUI_PSP
-	// save/load is gone, close the gap it left
-	configuration.SetCoord( 72, bTrainMap ? 380 : 335 );
-	quit.SetCoord( 72, bTrainMap ? 430 : 385 );
+	// save/load is gone, Join Ad-hoc takes its place
+	joinAdhoc.SetCoord( 72, bTrainMap ? 380 : 335 );
+	configuration.SetCoord( 72, bTrainMap ? 430 : 385 );
+	quit.SetCoord( 72, bTrainMap ? 480 : 435 );
 	return;
 #endif
 	configuration.SetCoord( 72, bTrainMap ? 430 : 380 );
