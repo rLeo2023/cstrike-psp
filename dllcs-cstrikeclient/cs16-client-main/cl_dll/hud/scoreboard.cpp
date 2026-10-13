@@ -164,7 +164,16 @@ bool CHudScoreboard :: ShouldDrawScoreboard() const
 }
 
 // Y positions
+#ifdef __PSP__
+// both teams of 5 have to fit on 480x272: taller box, rows closer together
+#define ROW_GAP  13
+#define SB_YMARGIN 16
+#define SB_TEAM_GAP 0.6f	// space after each team's players
+#else
 #define ROW_GAP  15
+#define SB_YMARGIN 90
+#define SB_TEAM_GAP 2.0f
+#endif
 
 int CHudScoreboard :: Draw( float flTime )
 {
@@ -175,7 +184,7 @@ int CHudScoreboard :: Draw( float flTime )
 	{
 		xstart     = 0.125f * ScreenWidth;
 		xend       = ScreenWidth - xstart;
-		ystart     = 90;
+		ystart     = SB_YMARGIN;
 		yend       = ScreenHeight - ystart;
 		m_colors.r = 0;
 		m_colors.g = 0;
@@ -212,11 +221,19 @@ int CHudScoreboard :: DrawScoreboard( float fTime )
 	g_Columns[COL_KILLS] = Column( g_Columns[COL_DEATHS].end - 10, Localize( "#PlayerScore" ) );
 	g_Columns[COL_KILLS].end = min( g_Columns[COL_KILLS].end, g_Columns[COL_KILLS].start - DrawUtils::HudStringLen( "9999" ) );
 
+#ifdef __PSP__
+	// no HP / Money columns: the server (ReGameDLL without BUILD_LATEST)
+	// never sends HealthInfo / Account, they only showed 0 and took room
+	g_Columns[COL_MONEY] = Column( g_Columns[COL_KILLS].end );
+	g_Columns[COL_MONEY].end = g_Columns[COL_MONEY].start;
+	g_Columns[COL_HP] = g_Columns[COL_MONEY];
+#else
 	g_Columns[COL_MONEY] = Column( g_Columns[COL_KILLS].end - 10, Localize( "#Cstrike_ACCOUNT" ) );
 	g_Columns[COL_MONEY].end = min( g_Columns[COL_MONEY].end, g_Columns[COL_MONEY].start - DrawUtils::HudStringLen( "$999999" ) );
 
 	g_Columns[COL_HP] = Column( g_Columns[COL_MONEY].end - 10, Localize( "#Cstrike_HEALTH" ) );
 	g_Columns[COL_HP].end = min( g_Columns[COL_HP].end, g_Columns[COL_HP].start - DrawUtils::HudStringLen( "999999" ) );
+#endif
 
 	g_Columns[COL_ATTRIB] = Column( g_Columns[COL_HP].end - 10 );
 	g_Columns[COL_ATTRIB].end = g_Columns[COL_ATTRIB].start - DrawUtils::HudStringLen( "#Cstrike_DEFUSE_KIT" );
@@ -238,13 +255,19 @@ int CHudScoreboard :: DrawScoreboard( float fTime )
 		strncpy( ServerName, gHUD.m_Teamplay ? "TEAMS" : "PLAYERS", 80 );
 
 	DrawUtils::DrawHudString( g_Columns[COL_NAME].start, ypos, g_Columns[COL_NAME].end, ServerName, 255, 140, 0 );
+#ifndef __PSP__
 	DrawUtils::DrawHudStringReverse( g_Columns[COL_HP].start, ypos, g_Columns[COL_HP].end, g_Columns[COL_HP].name, 255, 140, 0 );
 	DrawUtils::DrawHudStringReverse( g_Columns[COL_MONEY].start, ypos, g_Columns[COL_MONEY].end, g_Columns[COL_MONEY].name, 255, 140, 0 );
+#endif
 	DrawUtils::DrawHudStringReverse( g_Columns[COL_KILLS].start, ypos, g_Columns[COL_KILLS].end, g_Columns[COL_KILLS].name, 255, 140, 0 );
 	DrawUtils::DrawHudStringReverse( g_Columns[COL_DEATHS].start, ypos, g_Columns[COL_DEATHS].end, g_Columns[COL_DEATHS].name, 255, 140, 0 );
 	DrawUtils::DrawHudStringReverse( g_Columns[COL_PING].start, ypos, g_Columns[COL_PING].end, g_Columns[COL_PING].name, 255, 140, 0 );
 
+#ifdef __PSP__
+	list_slot += 1.4f;
+#else
 	list_slot += 2;
+#endif
 	ypos = ystart + (list_slot * ROW_GAP);
 	FillRGBA( xstart, ypos, xend - xstart, 1, 255, 140, 0, 255);  // draw the separator line
 
@@ -387,15 +410,24 @@ int CHudScoreboard :: DrawTeams( float list_slot )
 		{
 		case TEAM_TERRORIST:
 		{
+#ifdef __PSP__
+			// the localized "%s1 - %s2 players" format came out empty
+			snprintf( teamName, sizeof( teamName ), "Terrorists (%s)", numPlayers );
+#else
 			const char *args[2] = { Localize( "#Cstrike_ScoreBoard_Ter" ), numPlayers };
 			Localize_Format( teamName, sizeof( teamName ), fmtString, args, 2 );
+#endif
 			DrawUtils::DrawHudNumberString( g_Columns[COL_KILLS].start, ypos, g_Columns[COL_KILLS].end, team_info->frags, r, g, b );
 			break;
 		}
 		case TEAM_CT:
 		{
+#ifdef __PSP__
+			snprintf( teamName, sizeof( teamName ), "Counter-Terrorists (%s)", numPlayers );
+#else
 			const char *args[2] = { Localize( "#Cstrike_ScoreBoard_CT" ), numPlayers };
 			Localize_Format( teamName, sizeof( teamName ), fmtString, args, 2 );
+#endif
 			DrawUtils::DrawHudNumberString( g_Columns[COL_KILLS].start, ypos, g_Columns[COL_KILLS].end, team_info->frags, r, g, b );
 			break;
 		}
@@ -405,16 +437,28 @@ int CHudScoreboard :: DrawTeams( float list_slot )
 			break;
 		}
 
+#ifdef __PSP__
+		// team rows have nothing in the attribute column: let the name use it
+		DrawUtils::DrawHudString( g_Columns[COL_NAME].start, ypos, g_Columns[COL_KILLS].end - 10, teamName, r, g, b );
+#else
 		DrawUtils::DrawHudString( g_Columns[COL_NAME].start, ypos, g_Columns[COL_NAME].end, teamName, r, g, b );
+#endif
 		DrawUtils::DrawHudNumberString( g_Columns[COL_PING].start, ypos, g_Columns[COL_PING].end, team_info->sumping / team_info->players, r, g, b );
 
 		team_info->already_drawn = TRUE;  // set the already_drawn to be TRUE, so this team won't get drawn again
 
 		// draw underline
+#ifdef __PSP__
+		list_slot += 1.1f;
+		FillRGBA( xstart, ystart + (list_slot * ROW_GAP), xend - xstart, 1, r, g, b, 255);
+
+		list_slot += 0.2f;
+#else
 		list_slot += 1.2f;
 		FillRGBA( xstart, ystart + (list_slot * ROW_GAP), xend - xstart, 1, r, g, b, 255);
 
 		list_slot += 0.4f;
+#endif
 		// draw all the players that belong to this team, indented slightly
 		list_slot = DrawPlayers( list_slot, 10, team_info->name );
 	}
@@ -546,7 +590,7 @@ int CHudScoreboard :: DrawPlayers( float list_slot, int nameoffset, const char *
 		list_slot++;
 	}
 
-	list_slot += 2.0f;
+	list_slot += SB_TEAM_GAP;
 
 	return list_slot;
 }

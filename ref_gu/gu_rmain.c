@@ -1218,9 +1218,21 @@ void R_EndFrame( void )
 	// flush any remaining 2D bits
 	R_Set2DMode( false );
 
-	// finish rendering.
+	// finish rendering. The wait is the time the GE still needed after the
+	// CPU was done building the frame: high means the GPU is the bottleneck
+	{
+		int listsize = sceGuCheckList();
+
+		if( listsize > r_perf.listmax )
+			r_perf.listmax = listsize;
+	}
 	sceGuFinish();
-	sceGuSync( GU_SYNC_FINISH, GU_SYNC_WAIT );
+	{
+		SceInt64 start = sceKernelGetSystemTimeWide();
+		sceGuSync( GU_SYNC_FINISH, GU_SYNC_WAIT );
+		r_perf.gpuwait += ( sceKernelGetSystemTimeWide() - start ) * 0.000001;
+		r_perf.swaps++;
+	}
 
 	gEngfuncs.GL_SwapBuffers(); // vsync
 

@@ -379,6 +379,20 @@ extern float		gldepthmin, gldepthmax;
 //
 void GL_BackendStartFrame( void );
 void GL_BackendEndFrame( void );
+
+// totals since the last "r_psp_report", see R_PSPReport_f (gu_image.c)
+typedef struct
+{
+	unsigned int	frames;		// world frames (GL_BackendEndFrame)
+	unsigned int	swaps;		// R_EndFrame calls
+	double		gpuwait;		// seconds spent in sceGuSync at the end of a frame
+	int		listmax;		// biggest display list of a frame, bytes (of PSP_GU_LIST_SIZE)
+	unsigned int	wpolys, epolys, spolys;
+	unsigned int	studio_models, sprite_models, particles;
+} ref_perf_t;
+
+extern ref_perf_t r_perf;
+
 void GL_CleanUpTextureUnits( int last );
 void GL_Bind( GLint tmu, GLenum texnum );
 void GL_MultiTexCoord2f( GLenum texture, GLfloat s, GLfloat t );

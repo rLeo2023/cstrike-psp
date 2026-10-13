@@ -111,7 +111,10 @@ static void GU_Init( void )
 	if( !guRender.disp_buffer )
 		gEngfuncs.Host_Error( "Memory allocation failled! (guRender.disp_buffer)\n" );
 
-	guRender.depth_buffer = ( void* )valloc( guRender.buffer_width * guRender.screen_height * guRender.buffer_bpp );
+	// the GE depth buffer is always 16 bit, whatever the color format: sized
+	// with buffer_bpp (4 with 8888) it wasted 272 KB of VRAM, which the
+	// textures can use instead
+	guRender.depth_buffer = ( void* )valloc( guRender.buffer_width * guRender.screen_height * 2 );
 	if( !guRender.depth_buffer )
 		gEngfuncs.Host_Error( "Memory allocation failled! (guRender.depth_buffer)\n" );
 
@@ -378,7 +381,10 @@ void GL_InitCommands( void )
 	gl_subdivide_size = gEngfuncs.Cvar_Get( "gl_subdivide_size", "256.0", FCVAR_GLCONFIG, "the division value for the sky brushes" );
 	gl_round_down = gEngfuncs.Cvar_Get( "gl_round_down", "1", FCVAR_GLCONFIG, "round texture sizes to nearest POT value" );
 	// these cvar not used by engine but some mods requires this
-	gl_depthoffset = gEngfuncs.Cvar_Get( "gl_depthoffset", "256.0", FCVAR_GLCONFIG, "depth offset for decals" );
+	// in 16-bit depth units: with zNear 4, 256 pulled a decal ~250 world units
+	// toward the camera at 500 units away, so far wall signs showed through
+	// whatever stood in front of them. Coplanar decals only need a few units
+	gl_depthoffset = gEngfuncs.Cvar_Get( "gl_depthoffset", "16.0", FCVAR_GLCONFIG, "depth offset for decals" );
 
 	// make sure gl_vsync is checked after vid_restart
 	SetBits( gl_vsync->flags, FCVAR_CHANGED );

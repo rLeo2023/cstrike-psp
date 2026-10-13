@@ -40,6 +40,9 @@ GNU General Public License for more details.
 #include "input.h"
 #include "enginefeatures.h"
 #include "render_api.h"	// decallist_t
+#if XASH_PSP
+#include "platform/psp/psp_perf.h"
+#endif
 
 
 pfnChangeGame	pChangeGame = NULL;
@@ -637,14 +640,25 @@ qboolean Host_FilterTime( float time )
 Host_Frame
 =================
 */
+#if XASH_PSP
+psp_perf_t psp_perf;
+#endif
+
 void Host_Frame( float time )
 {
+#if XASH_PSP
+	double	perf_start, perf_server, perf_frame;
+#endif
+
 	Host_CheckSleep();
 
 	// decide the simulation time
 	if( !Host_FilterTime( time ))
 		return;
 
+#if XASH_PSP
+	perf_start = Sys_DoubleTime();
+#endif
 	Host_InputFrame ();  // input frame
 #if XASH_PSP
 	{
@@ -654,11 +668,25 @@ void Host_Frame( float time )
 #endif
 	Host_ClientBegin (); // begin client
 	Host_GetCommands (); // dedicated in
+#if XASH_PSP
+	perf_server = Sys_DoubleTime();
 	Host_ServerFrame (); // server frame
+	psp_perf.server += Sys_DoubleTime() - perf_server;
+#else
+	Host_ServerFrame (); // server frame
+#endif
 	Host_ClientFrame (); // client frame
 	HTTP_Run();			 // both server and client
 
 	host.framecount++;
+
+#if XASH_PSP
+	perf_frame = Sys_DoubleTime() - perf_start;
+	psp_perf.work += perf_frame;
+	psp_perf.frames++;
+	if( perf_frame > psp_perf.worst )
+		psp_perf.worst = perf_frame;
+#endif
 }
 
 /*

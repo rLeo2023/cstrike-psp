@@ -19,6 +19,9 @@ GNU General Public License for more details.
 #include "library.h"
 #include "triangleapi.h"
 #include "ref_common.h"
+#if XASH_PSP
+#include "platform/psp/psp_perf.h"
+#endif
 
 typedef int (*PHYSICAPI)( int, server_physics_api_t*, physics_interface_t* );
 #if !XASH_DEDICATED
@@ -1801,7 +1804,16 @@ void SV_Physics( void )
 	svgame.globals->time = sv.time;
 
 	// let the progs know that a new frame has started
+#if XASH_PSP
+	{
+		// CS bots run here (CCSBotManager::StartFrame), with the game rules
+		double perf_start = Sys_DoubleTime();
+		svgame.dllFuncs.pfnStartFrame();
+		psp_perf.bots += Sys_DoubleTime() - perf_start;
+	}
+#else
 	svgame.dllFuncs.pfnStartFrame();
+#endif
 
 	// treat each object in turn
 	for( i = 0; i < svgame.numEntities; i++ )

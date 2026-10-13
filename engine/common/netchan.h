@@ -93,11 +93,17 @@ GNU General Public License for more details.
 	#undef NUM_PACKET_ENTITIES
 	#undef MAX_CUSTOM_BASELINES
 	#undef NET_MAX_FRAGMENT
+	#undef NETSPLIT_BACKUP
 	#define MULTIPLAYER_BACKUP		16
 	#define SINGLEPLAYER_BACKUP		16
 	#define NUM_PACKET_ENTITIES		32
 	#define MAX_CUSTOM_BASELINES		8
 	#define NET_MAX_FRAGMENT		32768
+	// every netchan holds NETSPLIT_BACKUP reassembly buffers of NET_MAX_PAYLOAD
+	// (32 KB) and the server has one netchan per player, bots included: 8 of
+	// them were 2.5 MB with 10 players. They only rebuild packets that came
+	// split over a real network (ad-hoc), never more than a couple at once
+	#define NETSPLIT_BACKUP		2
 #else
 #if XASH_LOW_MEMORY == 2
 	#undef MULTIPLAYER_BACKUP

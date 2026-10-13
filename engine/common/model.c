@@ -150,6 +150,33 @@ void Mod_Init( void )
 Mod_FreeAll
 ================
 */
+#if XASH_PSP
+/*
+================
+Mod_KeepBetweenMaps
+
+CS precaches the same player and weapon models on every map. Loading the
+player models again after a disconnect needs a 2.2 MB block in one piece,
+which a heap fragmented by two maps doesn't have any more (the 3rd map
+crashed). Kept loaded, they stay where the first map put them.
+================
+*/
+static qboolean Mod_KeepBetweenMaps( const model_t *mod )
+{
+	if( mod->type != mod_studio || !mod->mempool )
+		return false;
+
+	if( !Q_strnicmp( mod->name, "models/player/", 14 ))
+		return true;
+
+	if( !Q_strnicmp( mod->name, "models/v_", 9 ) || !Q_strnicmp( mod->name, "models/p_", 9 )
+		|| !Q_strnicmp( mod->name, "models/w_", 9 ) || !Q_strnicmp( mod->name, "models/shield/", 14 ))
+		return true;
+
+	return false;
+}
+#endif
+
 void Mod_FreeAll( void )
 {
 	int	i;
@@ -157,9 +184,32 @@ void Mod_FreeAll( void )
 #if !XASH_DEDICATED
 	Mod_ReleaseHullPolygons();
 #endif
+#if XASH_PSP
+	// what a level change does (Mod_PurgeStudioCache): the kept models are
+	// unreferenced until the next map precaches them, Mod_FreeUnused drops
+	// the ones it doesn't. Everything else goes now.
+	for( i = 0; i < mod_numknown; i++ )
+	{
+		if( i > 0 && Mod_KeepBetweenMaps( &mod_known[i] ))
+		{
+			mod_known[i].submodels = NULL;
+			mod_known[i].needload = NL_UNREFERENCED;
+			continue;
+		}
+		Mod_FreeModel( &mod_known[i] );
+	}
+
+	// trim the list to the last slot still in use
+	while( mod_numknown > 0 && !mod_known[mod_numknown - 1].name[0] )
+		mod_numknown--;
+
+	Mem_EmptyPool( com_studiocache );
+	Mod_ClearStudioCache();
+#else
 	for( i = 0; i < mod_numknown; i++ )
 		Mod_FreeModel( &mod_known[i] );
 	mod_numknown = 0;
+#endif
 }
 
 /*

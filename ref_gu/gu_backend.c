@@ -81,8 +81,22 @@ void GL_BackendEndFrame( void )
 {
 	mleaf_t	*curleaf;
 
+	// per frame counters for r_psp_report; with r_speeds 0 nothing reset them
+	r_perf.frames++;
+	r_perf.wpolys += r_stats.c_world_polys;
+	r_perf.epolys += r_stats.c_studio_polys;
+	r_perf.spolys += r_stats.c_sprite_polys;
+	r_perf.studio_models += r_stats.c_studio_models_drawn;
+	r_perf.sprite_models += r_stats.c_sprite_models_drawn;
+	r_perf.particles += r_stats.c_particle_count;
+
 	if( r_speeds->value <= 0 || !RI.drawWorld )
+	{
+		r_stats.c_world_polys = r_stats.c_studio_polys = r_stats.c_sprite_polys = 0;
+		r_stats.c_studio_models_drawn = r_stats.c_sprite_models_drawn = 0;
+		r_stats.c_particle_count = 0;
 		return;
+	}
 
 	if( !RI.viewleaf )
 		curleaf = WORLDMODEL->leafs;

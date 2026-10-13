@@ -2052,6 +2052,147 @@ void R_TextureList_f( void )
 
 /*
 ===============
+R_PSPReport_f
+
+"r_psp_report": compact summary for xash.log, run by the engine in game
+(cl_main.c). Textures by kind, RAM and VRAM, and the renderer counters
+averaged since the previous report.
+===============
+*/
+ref_perf_t r_perf;
+
+static const char *R_TextureKind( const char *name )
+{
+	const char *n = name;
+
+	if( *n == '#' ) n++;
+
+	if( !Q_strncmp( n, "models/", 7 ))
+	{
+		const char *base = n + 7;
+
+		if( Q_strstr( n, "player" )) return "player models";
+		if( !Q_strncmp( base, "v_", 2 ) || Q_strstr( n, "/v_" )) return "view weapons (v_)";
+		if( !Q_strncmp( base, "p_", 2 ) || !Q_strncmp( base, "w_", 2 )) return "world weapons (p_ w_)";
+		if( !Q_strncmp( base, "shield", 6 )) return "shield";
+		return "other models";
+	}
+	if( !Q_strncmp( n, "sprites/", 8 )) return "sprites";
+	if( !Q_strnicmp( n, "HUD/", 4 ) || Q_stristr( n, "hud" )) return "hud";
+	if( Q_strstr( n, "lightmap" )) return "lightmaps";
+	if( !Q_strncmp( n, "gfx/env", 7 )) return "sky";
+	if( !Q_strncmp( n, "gfx/", 4 ) || !Q_strncmp( n, "resource/", 9 )) return "menu";
+	if( !Q_strncmp( n, "maps/", 5 ) || Q_strstr( n, ".wad/" )) return "world";
+	if( *n == '{' ) return "decals";
+	if( *n == '*' ) return "internal";
+	return "other";
+}
+
+#define MAX_TEXKINDS	24
+
+typedef struct
+{
+	const char	*kind;
+	int		count, ram, vram;
+} texkind_t;
+
+static void R_PSPReport_f( void )
+{
+	texkind_t	kinds[MAX_TEXKINDS], tmp;
+	int		i, j, numkinds = 0, ram = 0, vram = 0;
+	gl_texture_t	*image;
+	const char	*arg = gEngfuncs.Cmd_Argc() > 1 ? gEngfuncs.Cmd_Argv( 1 ) : "";
+	float		f;
+
+	// "reset": start counting now (the engine sends it when a map is entered)
+	if( !Q_strcmp( arg, "reset" ))
+	{
+		memset( &r_perf, 0, sizeof( r_perf ));
+		return;
+	}
+
+	// "textures": also the texture memory by kind
+	if( Q_strcmp( arg, "textures" ))
+		goto counters;
+
+	memset( kinds, 0, sizeof( kinds ));
+
+	for( i = 0, image = gl_textures; i < gl_numTextures; i++, image++ )
+	{
+		const char *kind;
+		int	size;
+
+		if( !image->dstTexture ) continue;
+
+		kind = R_TextureKind( image->name );
+		for( j = 0; j < numkinds && kinds[j].kind != kind; j++ );
+		if( j == numkinds )
+		{
+			if( numkinds == MAX_TEXKINDS ) continue;
+			kinds[numkinds++].kind = kind;
+		}
+
+		size = image->size;
+		if( image->dstPalette && image->dstPalette != gl_palette_332 )
+			size += PALETTE_SIZE;
+
+		kinds[j].count++;
+		if( FBitSet( image->flags, TF_IMG_INVRAM ))
+		{
+			kinds[j].vram += size;
+			vram += size;
+		}
+		else
+		{
+			kinds[j].ram += size;
+			ram += size;
+		}
+	}
+
+	gEngfuncs.Con_Printf( "S_PSP: textures: RAM %d KB, VRAM %d KB (VRAM still free %d KB)\n",
+		ram / 1024, vram / 1024, (int)( vmemavail() / 1024 ));
+
+	// biggest RAM users first
+	for( i = 0; i < numkinds; i++ )
+	{
+		for( j = i + 1; j < numkinds; j++ )
+		{
+			if( kinds[j].ram > kinds[i].ram )
+			{
+				tmp = kinds[i];
+				kinds[i] = kinds[j];
+				kinds[j] = tmp;
+			}
+		}
+	}
+
+	for( i = 0; i < numkinds; i++ )
+	{
+		gEngfuncs.Con_Printf( "S_PSP:   %-22s %4d tex  RAM %5d KB  VRAM %5d KB\n",
+			kinds[i].kind, kinds[i].count, kinds[i].ram / 1024, kinds[i].vram / 1024 );
+	}
+
+counters:
+	if( r_perf.frames )
+	{
+		f = 1.0f / r_perf.frames;
+		gEngfuncs.Con_Printf( "S_PSP: render per frame: %d world polys, %d model polys (%d models), "
+			"%d sprites, %d particles\n",
+			(int)( r_perf.wpolys * f ), (int)( r_perf.epolys * f ), (int)( r_perf.studio_models * f ),
+			(int)( r_perf.sprite_models * f ), (int)( r_perf.particles * f ));
+	}
+
+	if( r_perf.swaps )
+	{
+		gEngfuncs.Con_Printf( "S_PSP: render: waiting for the GPU %.1f ms per frame, biggest display list %d KB\n",
+			r_perf.gpuwait * 1000.0 / r_perf.swaps, r_perf.listmax / 1024 );
+	}
+
+	memset( &r_perf, 0, sizeof( r_perf ));
+}
+
+/*
+===============
 R_InitImages
 ===============
 */
@@ -2075,6 +2216,7 @@ void R_InitImages( void )
 	GL_CreateInternalTextures();
 
 	gEngfuncs.Cmd_AddCommand( "texturelist", R_TextureList_f, "display loaded textures list" );
+	gEngfuncs.Cmd_AddCommand( "r_psp_report", R_PSPReport_f, "texture memory and renderer counters for xash.log" );
 }
 
 /*
@@ -2088,6 +2230,7 @@ void R_ShutdownImages( void )
 	int		i;
 
 	gEngfuncs.Cmd_RemoveCommand( "texturelist" );
+	gEngfuncs.Cmd_RemoveCommand( "r_psp_report" );
 	GL_CleanupAllTextureUnits();
 
 	for( i = 0, tex = gl_textures; i < gl_numTextures; i++, tex++ )

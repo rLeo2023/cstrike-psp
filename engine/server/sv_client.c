@@ -1262,7 +1262,7 @@ a deathmatch.
 */
 void SV_PutClientInServer( sv_client_t *cl )
 {
-	static byte    	msg_buf[0x20200];	// MAX_INIT_MSG + some space
+	static byte    	msg_buf[MAX_INIT_MSG + 0x200];	// MAX_INIT_MSG + some space
 	edict_t		*ent = cl->edict;
 	sizebuf_t		msg;
 
@@ -1360,6 +1360,9 @@ void SV_PutClientInServer( sv_client_t *cl )
 
 		// NOTE: it's will be fragmented automatically in right ordering
 		MSG_WriteBits( &msg, MSG_GetData( &sv.signon ), MSG_GetNumBitsWritten( &sv.signon ));
+#if XASH_PSP
+		Con_Printf( "S_PSP: signon %d bytes of %d\n", MSG_GetNumBytesWritten( &sv.signon ), MAX_INIT_MSG );
+#endif
 
 		if( cl->pViewEntity )
 			viewEnt = NUM_FOR_EDICT( cl->pViewEntity );
@@ -1588,6 +1591,10 @@ static qboolean SV_New_f( sv_client_t *cl )
 	// g-cont. why this is there?
 	memset( &cl->lastcmd, 0, sizeof( cl->lastcmd ));
 
+#if XASH_PSP
+	// MAX_INIT_MSG is smaller on PSP: how close the biggest messages get
+	Con_Printf( "S_PSP: connect message %d bytes of %d\n", MSG_GetNumBytesWritten( &msg ), MAX_INIT_MSG );
+#endif
 	Netchan_CreateFragments( &cl->netchan, &msg );
 	Netchan_FragSend( &cl->netchan );
 
@@ -1900,6 +1907,9 @@ static qboolean SV_SendRes_f( sv_client_t *cl )
 
 	SetBits( cl->flags, FCL_SEND_RESOURCES );
 	SV_SendResources( cl, &msg );
+#if XASH_PSP
+	Con_Printf( "S_PSP: resource list %d bytes of %d\n", MSG_GetNumBytesWritten( &msg ), MAX_INIT_MSG );
+#endif
 
 	Netchan_CreateFragments( &cl->netchan, &msg );
 	Netchan_FragSend( &cl->netchan );

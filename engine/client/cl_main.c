@@ -22,6 +22,9 @@ GNU General Public License for more details.
 #include "vgui_draw.h"
 #include "library.h"
 #include "vid_common.h"
+#if XASH_PSP
+#include "platform/psp/psp_perf.h"
+#endif
 
 #define MAX_TOTAL_CMDS		32
 #define MAX_CMD_BUFFER		8000
@@ -235,6 +238,61 @@ static void CL_PSP_CheckLowMemory( void )
 	Cbuf_AddText( va( "disconnect\nmenu_showmessagebox \"Not enough memory for %s with this many bots. Try fewer bots or another map.\"\n",
 		clgame.mapname ));
 }
+
+#define PSP_PERF_INTERVAL	30.0	// seconds between "perf" lines in xash.log
+
+static double psp_perfTime;
+static int psp_perfCount;
+
+static void CL_PSP_PerfReset( void )
+{
+	memset( &psp_perf, 0, sizeof( psp_perf ));
+	psp_perf.start = host.realtime;
+}
+
+/*
+===============
+CL_PSP_PerfReport
+
+every 30 s in game: where the frame time goes. The third one (90 s in)
+also lists what the memory is used by (pools, textures in RAM and VRAM).
+===============
+*/
+static void CL_PSP_PerfReport( void )
+{
+	void Mem_PSPReport( void );
+	double	elapsed, ms;
+	int	n;
+
+	if( cls.state != ca_active || !psp_perfTime || host.realtime < psp_perfTime )
+		return;
+
+	psp_perfTime = host.realtime + PSP_PERF_INTERVAL;
+	psp_perfCount++;
+	elapsed = host.realtime - psp_perf.start;
+	n = psp_perf.frames;
+
+	if( n > 0 && elapsed > 0.0 )
+	{
+		ms = 1000.0 / n;
+		Con_Printf( "S_PSP: perf %s, %.0f s: %.1f fps; per frame %.1f ms = server %.1f (bots %.1f) + render %.1f "
+			"+ sound %.1f + client %.1f + other %.1f; worst %.0f ms\n",
+			clgame.mapname, elapsed, n / elapsed, psp_perf.work * ms,
+			psp_perf.server * ms, psp_perf.bots * ms, psp_perf.render * ms, psp_perf.sound * ms,
+			psp_perf.client * ms,
+			( psp_perf.work - psp_perf.server - psp_perf.render - psp_perf.sound - psp_perf.client ) * ms,
+			psp_perf.worst * 1000.0 );
+	}
+
+	if( psp_perfCount == 3 )
+	{
+		Mem_PSPReport();
+		Cbuf_AddText( "r_psp_report textures\n" );
+	}
+	else Cbuf_AddText( "r_psp_report\n" );
+
+	CL_PSP_PerfReset();
+}
 #endif
 
 void CL_CheckClientState( void )
@@ -257,6 +315,12 @@ void CL_CheckClientState( void )
 			void PSP_LogHeapUsage( const char *when );
 			PSP_LogHeapUsage( va( "in game on %s", clgame.mapname ));
 			psp_reportTime = host.realtime + 90.0;
+
+			// measure from here, the loading frames would spoil the averages
+			CL_PSP_PerfReset();
+			psp_perfTime = host.realtime + PSP_PERF_INTERVAL;
+			psp_perfCount = 0;
+			Cbuf_AddText( "r_psp_report reset\n" );
 		}
 #endif
 		if(( cls.demoplayback || cls.disable_servercount != cl.servercount ) && cl.video_prepped )
@@ -275,6 +339,7 @@ void CL_CheckClientState( void )
 	}
 
 	CL_PSP_CheckLowMemory();
+	CL_PSP_PerfReport();
 #endif
 }
 
@@ -3107,8 +3172,16 @@ Host_ClientFrame
 */
 void Host_ClientFrame( void )
 {
+#if XASH_PSP
+	double	perf_start, perf_part, perf_render, perf_sound;
+#endif
+
 	// if client is not active, do nothing
 	if( !cls.initialized ) return;
+
+#if XASH_PSP
+	perf_start = Sys_DoubleTime();
+#endif
 
 	// if running the server remotely, send intentions now after
 	// the incoming messages have been read
@@ -3150,6 +3223,22 @@ void Host_ClientFrame( void )
 	// process VGUI
 	VGui_RunFrame ();
 
+#if XASH_PSP
+	perf_part = Sys_DoubleTime();
+	SCR_UpdateScreen ();
+	perf_render = Sys_DoubleTime() - perf_part;
+
+	perf_part = Sys_DoubleTime();
+	SND_UpdateSound ();
+	perf_sound = Sys_DoubleTime() - perf_part;
+
+	SCR_RunCinematic ();
+	CL_AdjustClock ();
+
+	psp_perf.render += perf_render;
+	psp_perf.sound += perf_sound;
+	psp_perf.client += Sys_DoubleTime() - perf_start - perf_render - perf_sound;
+#else
 	// update the screen
 	SCR_UpdateScreen ();
 
@@ -3161,6 +3250,7 @@ void Host_ClientFrame( void )
 
 	// adjust client time
 	CL_AdjustClock ();
+#endif
 }
 
 //============================================================================

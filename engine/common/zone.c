@@ -384,6 +384,142 @@ void Mem_PrintReport( void )
 #endif
 }
 
+#if XASH_PSP
+/*
+========================
+Mem_PSPReport
+
+one look at where the heap goes, for xash.log: model, map and sprite pools
+summed by kind, the other big pools by name, and what lives outside the
+pools (renderer textures, the game library's own objects, bot nav mesh).
+Textures follow in the renderer's "r_psp_report textures" lines.
+========================
+*/
+#define MEM_REPORT_KINDS	8
+#define MEM_REPORT_SITES	64	// distinct allocation sites tracked per pool
+#define MEM_REPORT_TOP	6	// biggest ones printed
+
+// which source lines own the memory of a big pool ("Zone Engine" is one
+// pool for half the engine, the name alone tells nothing)
+static void Mem_PSPReportSites( mempool_t *pool )
+{
+	struct { const char *file; uint line; size_t size; int count; } sites[MEM_REPORT_SITES];
+	int		numsites = 0, i, j, best;
+	memheader_t	*mem;
+
+	for( mem = pool->chain; mem; mem = mem->next )
+	{
+		for( i = 0; i < numsites; i++ )
+		{
+			if( sites[i].line == mem->fileline && sites[i].file == mem->filename )
+				break;
+		}
+
+		if( i == numsites )
+		{
+			if( numsites == MEM_REPORT_SITES )
+				continue;
+			sites[i].file = mem->filename;
+			sites[i].line = mem->fileline;
+			sites[i].size = 0;
+			sites[i].count = 0;
+			numsites++;
+		}
+
+		sites[i].size += mem->size;
+		sites[i].count++;
+	}
+
+	for( j = 0; j < MEM_REPORT_TOP && numsites > 0; j++ )
+	{
+		best = 0;
+		for( i = 1; i < numsites; i++ )
+		{
+			if( sites[i].size > sites[best].size )
+				best = i;
+		}
+
+		if( sites[best].size < 32 * 1024 )
+			break;
+
+		Con_Printf( "S_PSP:     %6d KB in %d blocks from %s:%u\n", (int)( sites[best].size / 1024 ),
+			sites[best].count, Mem_CheckFilename( sites[best].file ), sites[best].line );
+
+		sites[best] = sites[--numsites];
+	}
+}
+
+void Mem_PSPReport( void )
+{
+	static const char *kindnames[MEM_REPORT_KINDS] =
+	{
+		"view weapon models (v_)", "world weapon models (p_ w_)", "player models",
+		"other models", "map (bsp)", "sprites", "wads", "other pools"
+	};
+	size_t		kindsize[MEM_REPORT_KINDS] = { 0 };
+	int		kindcount[MEM_REPORT_KINDS] = { 0 };
+	size_t		total = 0;
+	struct mallinfo	mi = mallinfo();
+	mempool_t		*pool;
+	int		i;
+
+	Con_Printf( "S_PSP: memory, pools of 128 KB or more:\n" );
+
+	for( pool = poolchain; pool; pool = pool->next )
+	{
+		const char *name = pool->name;
+		int kind;
+
+		total += pool->realsize;
+
+		if( name[0] == '^' && name[1] == '2' )
+			name += 2; // model pools are named "^2<path>^7"
+
+		if( !Q_strncmp( name, "models/", 7 ))
+		{
+			const char *base = name + 7;
+
+			if( !Q_strncmp( base, "v_", 2 )) kind = 0;
+			else if( !Q_strncmp( base, "p_", 2 ) || !Q_strncmp( base, "w_", 2 )) kind = 1;
+			else if( Q_strstr( base, "player" )) kind = 2;
+			else kind = 3;
+		}
+		else if( !Q_strncmp( name, "maps/", 5 ) || name[0] == '*' ) kind = 4;
+		else if( !Q_strncmp( name, "sprites/", 8 )) kind = 5;
+		else if( Q_stristr( name, ".wad" )) kind = 6;
+		else
+		{
+			kind = 7;
+			if( pool->realsize >= 128 * 1024 )
+				Con_Printf( "S_PSP:   %-30s %6d KB\n", pool->name, (int)( pool->realsize / 1024 ));
+			if( pool->realsize >= 1024 * 1024 )
+				Mem_PSPReportSites( pool );
+		}
+
+		kindsize[kind] += pool->realsize;
+		kindcount[kind]++;
+
+		// the map and the player models: also by source line
+		if( kind != 7 && pool->realsize >= 1024 * 1024 )
+		{
+			Con_Printf( "S_PSP:   %-30s %6d KB\n", name, (int)( pool->realsize / 1024 ));
+			Mem_PSPReportSites( pool );
+		}
+	}
+
+	for( i = 0; i < MEM_REPORT_KINDS - 1; i++ )
+	{
+		if( kindcount[i] )
+			Con_Printf( "S_PSP:   %-30s %6d KB (%d)\n", kindnames[i], (int)( kindsize[i] / 1024 ), kindcount[i] );
+	}
+	Con_Printf( "S_PSP:   %-30s %6d KB (%d)\n", kindnames[7], (int)( kindsize[7] / 1024 ), kindcount[7] );
+
+	Con_Printf( "S_PSP: memory: pools %d KB, malloc in use %d KB, outside the pools %d KB "
+		"(textures, game library objects, nav mesh)\n",
+		(int)( total / 1024 ), (int)( mi.uordblks / 1024 ), (int)(( mi.uordblks - total ) / 1024 ));
+}
+#endif
+
 void Mem_PrintList( size_t minallocationsize )
 {
 	mempool_t		*pool;
