@@ -2182,6 +2182,17 @@ counters:
 			(int)( r_perf.sprite_models * f ), (int)( r_perf.particles * f ));
 	}
 
+	if( r_perf.frames )
+	{
+		double ms = 1000.0 / r_perf.frames;
+
+		// models = animation (client code) + vertices; the first person
+		// weapon is counted apart (its vertices are also inside "vertices")
+		gEngfuncs.Con_Printf( "S_PSP: render ms per frame: world %.1f, models %.1f (of which vertices %.1f), "
+			"first person weapon %.1f\n",
+			r_perf.t_world * ms, r_perf.t_studio * ms, r_perf.t_points * ms, r_perf.t_viewmodel * ms );
+	}
+
 	if( r_perf.swaps )
 	{
 		gEngfuncs.Con_Printf( "S_PSP: render: waiting for the GPU %.1f ms per frame, biggest display list %d KB of %d%s\n",

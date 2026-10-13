@@ -26,6 +26,9 @@ typedef struct
 	double		server;	// Host_ServerFrame, bots included
 	double		bots;	// game StartFrame: bots and game rules
 	double		render;	// SCR_UpdateScreen, GPU wait included
+	double		scene;	// of render: V_RenderView, the 3D view
+	double		hud;	// of render: client HUD_Redraw and VGUI
+	double		endframe;	// of render: R_EndFrame, list finish + swap
 	double		sound;	// SND_UpdateSound
 	double		client;	// the rest of Host_ClientFrame
 	double		worst;	// longest single frame

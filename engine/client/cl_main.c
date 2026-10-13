@@ -282,6 +282,9 @@ static void CL_PSP_PerfReport( void )
 			psp_perf.client * ms,
 			( psp_perf.work - psp_perf.server - psp_perf.render - psp_perf.sound - psp_perf.client ) * ms,
 			psp_perf.worst * 1000.0 );
+		Con_Printf( "S_PSP: render split per frame: 3D view %.1f ms + HUD %.1f + end of frame %.1f + rest %.1f\n",
+			psp_perf.scene * ms, psp_perf.hud * ms, psp_perf.endframe * ms,
+			( psp_perf.render - psp_perf.scene - psp_perf.hud - psp_perf.endframe ) * ms );
 	}
 
 	if( psp_perfCount == 3 )

@@ -374,7 +374,13 @@ void CGameStudioModelRenderer::StudioSetupBones(void)
 		else
 		{
 			ConcatTransforms((*m_pbonetransform)[pbones[i].parent], bonematrix, (*m_pbonetransform)[i]);
+#ifdef __PSP__
+			// hardware: the root light transform is a copy of the bone one,
+			// so every child comes out the same as well
+			MatrixCopy((*m_pbonetransform)[i], (*m_plighttransform)[i]);
+#else
 			ConcatTransforms((*m_plighttransform)[pbones[i].parent], bonematrix, (*m_plighttransform)[i]);
+#endif
 		}
 	}
 }
@@ -927,6 +933,13 @@ int CGameStudioModelRenderer::_StudioDrawPlayer(int flags, entity_state_t *pplay
 
 	if (flags & STUDIO_RENDER)
 	{
+#ifdef __PSP__
+		// players outside the view: skip the bones and the drawing, like
+		// the engine does for every other studio model (it already culled
+		// with the transform set up above)
+		if (!IEngineStudio.StudioCheckBBox())
+			return 0;
+#endif
 		(*m_pModelsDrawn)++;
 		(*m_pStudioModelCount)++;
 

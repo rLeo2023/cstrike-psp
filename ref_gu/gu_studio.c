@@ -2591,7 +2591,19 @@ R_StudioDrawPoints
 
 ===============
 */
+static void R_StudioDrawPointsInternal( void );
+static qboolean r_perf_viewmodel;	// inside R_DrawViewModel: counted there
+
 static void R_StudioDrawPoints( void )
+{
+	double start = R_PerfTime();
+
+	R_StudioDrawPointsInternal();
+	if( !r_perf_viewmodel )
+		r_perf.t_points += R_PerfTime() - start;
+}
+
+static void R_StudioDrawPointsInternal( void )
 {
 	int		i, j, k, m_skinnum;
 	float		shellscale = 0.0f;
@@ -3946,7 +3958,17 @@ void R_StudioDrawModelInternal( cl_entity_t *e, int flags )
 R_DrawStudioModel
 =================
 */
+static void R_DrawStudioModelInternal( cl_entity_t *e );
+
 void R_DrawStudioModel( cl_entity_t *e )
+{
+	double start = R_PerfTime();
+
+	R_DrawStudioModelInternal( e );
+	r_perf.t_studio += R_PerfTime() - start;
+}
+
+static void R_DrawStudioModelInternal( cl_entity_t *e )
 {
 	if( FBitSet( RI.params, RP_ENVVIEW ))
 		return;
@@ -3982,7 +4004,17 @@ void R_DrawStudioModel( cl_entity_t *e )
 R_RunViewmodelEvents
 =================
 */
+static void R_RunViewmodelEventsInternal( void );
+
 void R_RunViewmodelEvents( void )
+{
+	double start = R_PerfTime();
+
+	R_RunViewmodelEventsInternal();
+	r_perf.t_viewmodel += R_PerfTime() - start;
+}
+
+static void R_RunViewmodelEventsInternal( void )
 {
 	int	i;
 	vec3_t simorg;
@@ -4033,7 +4065,19 @@ void R_GatherPlayerLight( void )
 R_DrawViewModel
 =================
 */
+static void R_DrawViewModelInternal( void );
+
 void R_DrawViewModel( void )
+{
+	double start = R_PerfTime();
+
+	r_perf_viewmodel = true;
+	R_DrawViewModelInternal();
+	r_perf_viewmodel = false;
+	r_perf.t_viewmodel += R_PerfTime() - start;
+}
+
+static void R_DrawViewModelInternal( void )
 {
 	qboolean m_flip;
 

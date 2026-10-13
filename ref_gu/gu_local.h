@@ -389,9 +389,16 @@ typedef struct
 	int		listmax;		// biggest display list of a frame, bytes (of PSP_GU_LIST_SIZE)
 	unsigned int	wpolys, epolys, spolys;
 	unsigned int	studio_models, sprite_models, particles;
+	double		t_world;		// R_DrawWorld
+	double		t_studio;		// R_DrawStudioModel: animation (client) + drawing
+	double		t_points;		// R_StudioDrawPoints: vertices, lighting, triangles
+	double		t_viewmodel;	// R_DrawViewModel (first person weapon)
 } ref_perf_t;
 
 extern ref_perf_t r_perf;
+
+// seconds, for the r_perf timers
+#define R_PerfTime()	( sceKernelGetSystemTimeWide() * 0.000001 )
 
 void GL_CleanUpTextureUnits( int last );
 void GL_Bind( GLint tmu, GLenum texnum );

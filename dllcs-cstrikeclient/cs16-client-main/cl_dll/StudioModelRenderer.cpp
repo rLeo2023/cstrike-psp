@@ -732,7 +732,13 @@ void CStudioModelRenderer::StudioSetupBones(void)
 		else
 		{
 			ConcatTransforms((*m_pbonetransform)[pbones[i].parent], bonematrix, (*m_pbonetransform)[i]);
+#ifdef __PSP__
+			// hardware: the root light transform is a copy of the bone one,
+			// so every child comes out the same as well
+			MatrixCopy((*m_pbonetransform)[i], (*m_plighttransform)[i]);
+#else
 			ConcatTransforms((*m_plighttransform)[pbones[i].parent], bonematrix, (*m_plighttransform)[i]);
+#endif
 		}
 	}
 }

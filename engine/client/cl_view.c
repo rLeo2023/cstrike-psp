@@ -21,6 +21,9 @@ GNU General Public License for more details.
 #include "sound.h"
 #include "input.h" // touch
 #include "platform/platform.h" // GL_UpdateSwapInterval
+#if XASH_PSP
+#include "platform/psp/psp_perf.h"
+#endif
 
 /*
 ===============
@@ -318,6 +321,10 @@ void V_RenderView( void )
 	if( !cl.video_prepped || ( !ui_renderworld->value && UI_IsVisible() && !cl.background ))
 		return; // still loading
 
+#if XASH_PSP
+	double perf_start = Sys_DoubleTime();
+#endif
+
 	V_CalcViewRect ();	// compute viewport rectangle
 	V_SetRefParams( &rp );
 	V_SetupViewModel ();
@@ -345,6 +352,10 @@ void V_RenderView( void )
 	// draw debug triangles on a server
 	SV_DrawDebugTriangles ();
 	ref.dllFuncs.GL_BackendEndFrame ();
+
+#if XASH_PSP
+	psp_perf.scene += Sys_DoubleTime() - perf_start;
+#endif
 }
 
 #define POINT_SIZE		16.0f
@@ -457,9 +468,15 @@ void V_PostRender( void )
 
 	if( cls.state == ca_active && cls.signon == SIGNONS && cls.scrshot_action != scrshot_mapshot )
 	{
+#if XASH_PSP
+		double perf_start = Sys_DoubleTime();
+#endif
 		SCR_TileClear();
 		CL_DrawHUD( CL_ACTIVE );
 		VGui_Paint();
+#if XASH_PSP
+		psp_perf.hud += Sys_DoubleTime() - perf_start;
+#endif
 	}
 
 	switch( cls.scrshot_action )
@@ -493,5 +510,13 @@ void V_PostRender( void )
 
 	SCR_MakeScreenShot();
 	ref.dllFuncs.R_AllowFog( true );
+#if XASH_PSP
+	{
+		double perf_start = Sys_DoubleTime();
+		ref.dllFuncs.R_EndFrame();
+		psp_perf.endframe += Sys_DoubleTime() - perf_start;
+	}
+#else
 	ref.dllFuncs.R_EndFrame();
+#endif
 }

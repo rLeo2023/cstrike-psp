@@ -2007,7 +2007,17 @@ void R_DrawTriangleOutlines( void )
 R_DrawWorld
 =============
 */
+static void R_DrawWorldInternal( void );
+
 void R_DrawWorld( void )
+{
+	double perf_start = R_PerfTime();
+
+	R_DrawWorldInternal();
+	r_perf.t_world += R_PerfTime() - perf_start;
+}
+
+static void R_DrawWorldInternal( void )
 {
 	double	start, end;
 

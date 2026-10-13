@@ -49,6 +49,37 @@ void SinCosFastVector(float r1, float r2, float r3, float r4,
 }
 #endif
 
+#ifdef __PSP__
+// The PSP FPU is single precision only, so sin()/cos()/acos() on doubles run
+// in software and bone setup spent most of its time there. The VFPU does
+// sine and cosine in one instruction (same code as the engine's SinCos).
+static inline void SinCosVFPU( float radians, float *sine, float *cosine )
+{
+	__asm__ (
+		".set		push\n"
+		".set		noreorder\n"
+		"mfc1		$8, %2\n"
+		"mtv		$8, S000\n"
+		"vcst.s		S001, VFPU_2_PI\n"
+		"vmul.s		S000, S000, S001\n"
+		"vrot.p		C002, S000, [s, c]\n"
+		"sv.s		S002, %0\n"
+		"sv.s		S003, %1\n"
+		".set		pop\n"
+		: "=m"( *sine ), "=m"( *cosine )
+		: "f"( radians )
+		: "$8"
+	);
+}
+
+static inline float SinVFPU( float radians )
+{
+	float s, c;
+	SinCosVFPU( radians, &s, &c );
+	return s;
+}
+#endif
+
 
 /*
 ====================
@@ -104,6 +135,10 @@ void AngleQuaternion( float *angles, vec4_t quaternion )
 					  angles[0] * 0.5, 0,
 					  &sy, &sp, &sr, NULL,
 					  &cy, &cp, &cr, NULL);
+#elif defined(__PSP__)
+	SinCosVFPU( angles[2] * 0.5f, &sy, &cy );
+	SinCosVFPU( angles[1] * 0.5f, &sp, &cp );
+	SinCosVFPU( angles[0] * 0.5f, &sr, &cr );
 #else
 	float		angle;
 
@@ -154,6 +189,41 @@ void QuaternionSlerp( vec4_t p, vec4_t q, float t, vec4_t qt )
 	}
 
 	cosom = p[0]*q[0] + p[1]*q[1] + p[2]*q[2] + p[3]*q[3];
+
+#ifdef __PSP__
+	if ((1.0f + cosom) > 0.000001f)
+	{
+		if ((1.0f - cosom) > 0.000001f)
+		{
+			omega = acosf( cosom );
+			sinom = SinVFPU( omega );
+			sclp = SinVFPU( (1.0f - t)*omega ) / sinom;
+			sclq = SinVFPU( t*omega ) / sinom;
+		}
+		else
+		{
+			sclp = 1.0f - t;
+			sclq = t;
+		}
+		for (i = 0; i < 4; i++) {
+			qt[i] = sclp * p[i] + sclq * q[i];
+		}
+	}
+	else
+	{
+		qt[0] = -q[1];
+		qt[1] = q[0];
+		qt[2] = -q[3];
+		qt[3] = q[2];
+		sclp = SinVFPU( (1.0f - t) * (0.5f * (float)M_PI) );
+		sclq = SinVFPU( t * (0.5f * (float)M_PI) );
+		for (i = 0; i < 3; i++)
+		{
+			qt[i] = sclp * p[i] + sclq * qt[i];
+		}
+	}
+	return;
+#endif
 
 	if ((1.0 + cosom) > 0.000001)
 	{
