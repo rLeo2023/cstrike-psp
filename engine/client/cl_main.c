@@ -285,6 +285,11 @@ static void CL_PSP_PerfReport( void )
 		Con_Printf( "S_PSP: render split per frame: 3D view %.1f ms + HUD %.1f + end of frame %.1f + rest %.1f\n",
 			psp_perf.scene * ms, psp_perf.hud * ms, psp_perf.endframe * ms,
 			( psp_perf.render - psp_perf.scene - psp_perf.hud - psp_perf.endframe ) * ms );
+		if( psp_perf.swaps )
+			Con_Printf( "S_PSP: screen: %s fps mode, %.2f refreshes per frame, %.0f%% of the frames late; "
+				"%.1f ms per frame outside the measured work\n",
+				Cvar_VariableString( "psp_fps" ), (float)psp_perf.refreshes / psp_perf.swaps,
+				100.0f * psp_perf.late / psp_perf.swaps, elapsed * ms - psp_perf.work * ms );
 	}
 
 	if( psp_perfCount == 3 )

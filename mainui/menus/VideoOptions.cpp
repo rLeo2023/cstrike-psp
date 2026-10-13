@@ -38,6 +38,15 @@ public:
 	void SaveAndPopMenu() override;
 	void GammaUpdate();
 	void GammaGet();
+#ifdef MAINUI_PSP
+	void SetFPS( int fps );
+	void SetFPS30() { SetFPS( 30 ); }
+	void SetFPS60() { SetFPS( 60 ); }
+	void UpdateFPSButtons();
+
+	CMenuPicButton	fps30;
+	CMenuPicButton	fps60;
+#endif
 
 	int		outlineWidth;
 
@@ -80,6 +89,24 @@ void CMenuVidOptions::GammaGet( void )
 
 	gammaIntensity.SetOriginalValue( val );
 }
+
+#ifdef MAINUI_PSP
+// in game frame rate, locked to the screen refresh (engine cvar psp_fps).
+// The active one is drawn in the normal button color, the other one grey
+void CMenuVidOptions::SetFPS( int fps )
+{
+	EngFuncs::CvarSetValue( "psp_fps", fps );
+	UpdateFPSButtons();
+}
+
+void CMenuVidOptions::UpdateFPSButtons( void )
+{
+	bool is60 = EngFuncs::GetCvarFloat( "psp_fps" ) >= 60.0f;
+
+	fps30.colorBase = is60 ? uiColorHelp : uiPromptTextColor;
+	fps60.colorBase = is60 ? uiPromptTextColor : uiColorHelp;
+}
+#endif
 
 void CMenuVidOptions::SaveAndPopMenu( void )
 {
@@ -172,7 +199,23 @@ void CMenuVidOptions::_Init( void )
 	glareReduction.SetCoord( 72, 400 );
 	glareReduction.SetNameAndStatus( L( "GameUI_Brightness" ), L( "Set brightness level" ) );
 	glareReduction.Setup( 0, 3, 0.1 );
-#ifndef MAINUI_PSP
+#ifdef MAINUI_PSP
+	// the slider names are drawn 1.5 lines above the bar: with the PSP font
+	// 60 units apart put each name on the bar above it
+	screenSize.SetCoord( 72, 280 );
+	gammaIntensity.SetCoord( 72, 365 );
+	glareReduction.SetCoord( 72, 450 );
+
+	fps30.SetNameAndStatus( L( "30 FPS" ), L( "Steady 30 frames per second in game (default)" ) );
+	fps30.SetCoord( 72, 500 );
+	fps30.onReleased = VoidCb( &CMenuVidOptions::SetFPS30 );
+
+	fps60.SetNameAndStatus( L( "60 FPS" ), L( "Up to 60 frames per second in game, drops to 30 in busy scenes" ) );
+	fps60.SetCoord( 72, 548 );
+	fps60.onReleased = VoidCb( &CMenuVidOptions::SetFPS60 );
+
+	done.SetCoord( 72, 610 );
+#else
 	bump.SetNameAndStatus( L( "Bump-mapping" ), L( "Enable bump mapping" ) );
 	bump.SetCoord( 72, 515 );
 	if( !EngFuncs::GetCvarFloat( "r_vbo" ) )
@@ -190,11 +233,19 @@ void CMenuVidOptions::_Init( void )
 #endif
 	AddItem( background );
 	AddItem( banner );
+#ifndef MAINUI_PSP
 	AddItem( done );
+#endif
 	AddItem( screenSize );
 	AddItem( gammaIntensity );
 	AddItem( glareReduction );
-#ifndef MAINUI_PSP
+#ifdef MAINUI_PSP
+	// top to bottom, so up/down on the d-pad follow the screen
+	AddItem( fps30 );
+	AddItem( fps60 );
+	AddItem( done );
+	UpdateFPSButtons();
+#else
 	if( UI_IsXashFWGS() )
 	{
 		AddItem( bump );
@@ -218,6 +269,9 @@ void CMenuVidOptions::_VidInit()
 {
 	outlineWidth = 2;
 	UI_ScaleCoords( NULL, NULL, &outlineWidth, NULL );
+#ifdef MAINUI_PSP
+	UpdateFPSButtons();
+#endif
 }
 
 ADD_MENU( menu_vidoptions, CMenuVidOptions, UI_VidOptions_Menu );

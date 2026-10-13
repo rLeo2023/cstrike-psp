@@ -126,6 +126,12 @@ static void GU_Init( void )
 	// Initialise the GU.
 	sceGuInit();
 
+	// R_EndFrame swaps right after the engine waited for the start of the
+	// vertical blank (GL_SwapBuffers): show the new frame now. With "next
+	// frame" it stayed hidden one refresh more while the GE was already
+	// drawing the next one into the buffer still on screen
+	guSwapBuffersBehaviour( PSP_DISPLAY_SETBUF_IMMEDIATE );
+
 	// Set up the GU.
 	sceGuStart( GU_DIRECT, guRender.context_list );
 

@@ -23,6 +23,7 @@ GNU General Public License for more details.
 #include "mod_local.h"
 #include "input.h"
 #include "vid_common.h"
+#include "platform/psp/psp_perf.h"
 
 // Set frame buffer
 #define PSP_FB_WIDTH		480
@@ -175,20 +176,25 @@ void *GL_GetProcAddress( const char *name )
 GL_UpdateSwapInterval
 ===============
 */
+// The frame rate is locked to the 60 Hz screen refresh, no tearing: in game
+// psp_fps 60 shows a frame on every refresh, 30 on every second one (the
+// Video options menu sets it), menus run at 60. gl_vsync is not used.
+static convar_t *psp_fps;
+static unsigned int vsync_last;
+static int vsync_interval;
+
 void GL_UpdateSwapInterval( void )
 {
-	// disable VSync while level is loading
-	if( cls.state < ca_active )
-	{
-		// setup vsync here
-		vsync = false;
-		SetBits( gl_vsync->flags, FCVAR_CHANGED );
-	}
-	else if( FBitSet( gl_vsync->flags, FCVAR_CHANGED ))
-	{
-		ClearBits( gl_vsync->flags, FCVAR_CHANGED );
-		vsync = (gl_vsync->value > 0) ? true : false;
-	}
+	if( !psp_fps )
+		psp_fps = Cvar_Get( "psp_fps", "30", FCVAR_ARCHIVE, "in game frame rate, 30 or 60 (locked to the screen refresh)" );
+
+	if( cls.state == ca_active )
+		vsync_interval = ( psp_fps->value < 60.0f ) ? 2 : 1;
+	else if( cls.state == ca_disconnected )
+		vsync_interval = 1;
+	else vsync_interval = 0; // disable VSync while level is loading
+
+	vsync = vsync_interval ? true : false;
 }
 
 static qboolean VID_SetScreenResolution( int width, int height )
@@ -223,7 +229,30 @@ static qboolean VID_SetScreenResolution( int width, int height )
 
 void GL_SwapBuffers( void )
 {
-	if ( vsync ) sceDisplayWaitVblankStart();
+	unsigned int target, now;
+
+	if( !vsync )
+	{
+		vsync_last = sceDisplayGetVcount();
+		return;
+	}
+
+	// 30 fps: two refreshes per frame counted from the previous swap. A
+	// frame that took longer just waits for the next refresh
+	target = vsync_last + vsync_interval;
+
+	if((int)( sceDisplayGetVcount() - target ) >= 0 )
+	{
+		sceDisplayWaitVblankStart();
+		psp_perf.late++;
+	}
+	else while((int)( sceDisplayGetVcount() - target ) < 0 )
+		sceDisplayWaitVblankStart();
+
+	now = sceDisplayGetVcount();
+	psp_perf.swaps++;
+	psp_perf.refreshes += now - vsync_last;
+	vsync_last = now;
 }
 
 int GL_SetAttribute( int attr, int val )

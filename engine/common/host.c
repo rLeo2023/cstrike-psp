@@ -549,6 +549,14 @@ double Host_CalcFPS( void )
 		fps = sys_ticrate.value;
 	}
 #if !XASH_DEDICATED
+#if XASH_PSP
+	// no cap, listen server or ad-hoc client: the swap waits for the screen
+	// refresh (psp_fps, vid_psp.c), a second limiter only made frames miss it
+	else if( !CL_IsPlaybackDemo() && !CL_IsRecordDemo( ))
+	{
+		return 0.0;
+	}
+#endif
 	else if( CL_IsPlaybackDemo() || CL_IsRecordDemo( )) // NOTE: we should play demos with same fps as it was recorded
 	{
 		fps = CL_GetDemoFramerate();

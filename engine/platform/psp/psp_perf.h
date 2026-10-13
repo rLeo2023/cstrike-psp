@@ -32,6 +32,9 @@ typedef struct
 	double		sound;	// SND_UpdateSound
 	double		client;	// the rest of Host_ClientFrame
 	double		worst;	// longest single frame
+	unsigned int	swaps;	// frames that waited for the screen refresh
+	unsigned int	refreshes;	// screen refreshes those frames took
+	unsigned int	late;	// of swaps: done after the refresh they aimed for
 } psp_perf_t;
 
 extern psp_perf_t psp_perf;
