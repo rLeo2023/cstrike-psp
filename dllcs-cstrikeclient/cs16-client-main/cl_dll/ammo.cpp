@@ -1718,6 +1718,10 @@ void CHudAmmo::DrawCrosshair()
 	// than a pixel and the GE, which only fills pixels whose center is
 	// covered, often drew nothing at all
 	const int thick = 2;
+
+	// shortest arm: 4 units (~3 pixels), so it never shrinks into dots
+	if ( iLength < 4 )
+		iLength = 4;
 #else
 	const int thick = 1;
 #endif
@@ -1787,7 +1791,12 @@ void CHudAmmo::CalculateCrosshairSize()
 		{
 			// GoldSrc does the same for small screens. Left at its initial -1
 			// (any PSP width) the crosshair was drawn thousands of pixels away
+#ifdef __PSP__
+			// 1024 made each arm ~2 units (under 2 pixels): it looked like dots
+			m_iCrosshairScaleBase = 640;
+#else
 			m_iCrosshairScaleBase = 1024;
+#endif
 		}
 		break;
 	case 1:

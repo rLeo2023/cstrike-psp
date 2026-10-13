@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "Bitmap.h"
 #include "PicButton.h"
 #include "YesNoMessageBox.h"
+#include "Field.h"
 #include "keydefs.h"
 #include "TabView.h"
 
@@ -33,6 +34,62 @@ static void UI_SaveSettings( void )
 	EngFuncs::ClientCmd( FALSE, "trysaveconfig\n" );
 	EngFuncs::PlayLocalSound( uiSoundLaunch );
 }
+
+/*
+=================
+CMenuPlayerName
+
+the firmware keyboard needs the volatile memory the engine keeps locked, so
+the name is typed with the engine's own on-screen keyboard: it shows up while
+the field has focus (d-pad + cross, "en" or up past the top row to leave it)
+=================
+*/
+class CMenuPlayerName : public CMenuFramework
+{
+public:
+	CMenuPlayerName() : CMenuFramework( "CMenuPlayerName" ) { }
+
+	void SaveAndPopMenu() override
+	{
+		if( UI::Names::CheckIsNameValid( name.GetBuffer() ))
+		{
+			name.WriteCvar();
+			EngFuncs::ClientCmd( FALSE, "trysaveconfig\n" );
+		}
+		CMenuFramework::SaveAndPopMenu();
+	}
+
+	void Hide() override
+	{
+		// the field never gets QM_LOSTFOCUS when the whole menu closes,
+		// so the keyboard would stay on screen over the next menu
+		UI_EnableTextInput( false );
+		CMenuFramework::Hide();
+	}
+
+private:
+	void _Init( void ) override
+	{
+		banner.SetPicture( ART_BANNER );
+
+		name.szName = L( "Name" );
+		name.szStatusText = L( "Enter your multiplayer display name" );
+		name.iMaxLength = 32;
+		name.LinkCvar( "name" );
+		// under the banner and Done, above the on-screen keyboard
+		name.SetRect( 320, 310, 256, 36 );
+
+		AddItem( background );
+		AddItem( banner );
+		AddButton( L( "Done" ), L( "Save the name and go back" ),
+			PC_DONE, VoidCb( &CMenuPlayerName::SaveAndPopMenu ));
+		AddItem( name );
+	}
+
+	CMenuField name;
+};
+
+ADD_MENU( menu_playername, CMenuPlayerName, UI_PlayerName_Menu );
 #endif
 
 class CMenuOptions: public CMenuFramework
@@ -65,6 +122,8 @@ void CMenuOptions::_Init( void )
 	AddItem( background );
 	AddItem( banner );
 #ifdef MAINUI_PSP
+	AddButton( L( "Player name" ), L( "Change your multiplayer display name" ),
+		PC_CUSTOMIZE, UI_PlayerName_Menu, QMF_NOTIFY );
 	AddButton( L( "Controls" ), L( "Look speed, analog stick, auto-aim and crosshair" ),
 		PC_CONTROLS, UI_AdvControls_Menu, QMF_NOTIFY );
 #else

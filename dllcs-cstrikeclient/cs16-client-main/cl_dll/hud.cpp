@@ -473,6 +473,19 @@ void CHud :: VidInit( void )
 	m_truescrinfo.iWidth = CVAR_GET_FLOAT("vid_width");
 	m_truescrinfo.iHeight = CVAR_GET_FLOAT("vid_height");
 
+	// newer engines (and the PSP build) only have "width"/"height";
+	// a zero TrueWidth divided by zero in the spectator HUD
+	if( m_truescrinfo.iWidth <= 0 || m_truescrinfo.iHeight <= 0 )
+	{
+		m_truescrinfo.iWidth = CVAR_GET_FLOAT("width");
+		m_truescrinfo.iHeight = CVAR_GET_FLOAT("height");
+	}
+	if( m_truescrinfo.iWidth <= 0 || m_truescrinfo.iHeight <= 0 )
+	{
+		m_truescrinfo.iWidth = ScreenWidth;
+		m_truescrinfo.iHeight = ScreenHeight;
+	}
+
 	// ----------
 	// Load Sprites
 	// ---------

@@ -60,16 +60,22 @@ The output is `build/engine/EBOOT.PBP` and `build/engine/xash.prx`.
 |---|---|
 | Analog stick | Move |
 | △ / ✕ / □ / ○ | Look up / down / left / right |
-| D-pad ↑ / ↓ | Jump / crouch (press once to stay down, again to stand up) |
+| R | Fire |
+| L (short press) | Secondary attack (zoom, silencer, burst, knife stab) |
+| L + ✕ | Jump |
+| L + ○ | Crouch while held |
+| L + □ / L + △ | Previous weapon / drop weapon |
+| L + ↑ / L + R | Grenades / knife |
+| D-pad ↓ | Crouch (press once to stay down, again to stand up) |
 | D-pad ← / → | Next weapon / use and reload |
-| R / L | Fire / secondary attack |
-| SELECT (short press) | Buy menu (includes "9. Autobuy", from `autobuy.txt`) |
-| SELECT + ← / ✕ / □ / ○ / R | Drop weapon / last weapon / grenades / change team / knife |
+| D-pad ↑ | Change team |
+| SELECT | Buy menu (includes "9. Autobuy", from `autobuy.txt`) |
 | START | Menu |
 
 In text menus: D-pad ↑/↓ moves the cursor, ✕ selects, ○ closes.
 The buttons are set in `cstrike/userconfig.cfg`. Look speed, invert look, analog stick speed and
-deadzone, aim assist and crosshair are in Options → Controls. Settings are saved when you leave a
+deadzone, aim assist and crosshair are in Options → Controls, and the player name in
+Options → Player name (on-screen keyboard: D-pad and ✕). Settings are saved when you leave a
 settings page and with Options → Save settings.
 
 ## Ad-hoc multiplayer
@@ -90,10 +96,16 @@ address, and enable the built-in PRO ad-hoc server on one of them only.
   and effect textures at half resolution (HUD and menus at full); sounds converted to 8 bit / 22 kHz
   and loaded on first use; bot navigation mesh streamed from disk and only loaded when there are
   bots; model loading without intermediate copies; smaller entity history, temp entity, particle and
-  beam pools; no radar; corpses removed after the death animation. Dust2 5v5 keeps ~7 MB free.
+  beam pools; no radar; corpses removed after the death animation; bot navigation meshes loaded
+  without the "encounter spots" (~1.5-2 MB per map). Dust2 5v5 keeps ~7 MB free.
+- **Low memory**: when the heap runs low in a game, sounds that aren't playing are freed (they
+  load again when needed); if that isn't enough the game goes back to the menu with a message
+  instead of freezing the console.
 - **Rendering**: software clipping of first-person weapon triangles; fixed back-face culling with
   `cl_righthand 1`; crosshair visible with `hud_scale` < 1; 45 fps cap that sleeps instead of
-  busy-waiting (saves battery).
+  busy-waiting (saves battery); map sprites farther than 1500 units aren't drawn (the 16-bit
+  depth buffer let them show through walls); no spectator inset window.
+- **Bots**: with 8 or more bots their full think runs 8 times a second instead of 10.
 - **Gameplay**: text menus with a gamepad cursor (team selection, buying), autobuy in the buy menu,
   game menu with map, number of bots and bot difficulty (Easy / Medium), client-side aim assist,
   PSP controls page, settings saved on the spot, localized hint texts, fixed magazine reloads
@@ -106,7 +118,9 @@ address, and enable the built-in PRO ad-hoc server on one of them only.
 
 ## Known issues
 
-- Large maps may not fit in memory, especially as the second or third map of a session.
+- Large maps may not fit in memory, especially as the second or third map of a session. With
+  many bots on a heavy map the game may go back to the menu with a "Not enough memory" message:
+  use fewer bots.
 - Ad-hoc has been tested on PPSSPP; tests on real PSPs are welcome.
 - With many bots (4v4, 5v5) the frame rate drops in busy moments.
 

@@ -429,6 +429,61 @@ void S_PurgeSoundData( void )
 		sfx->cache = NULL;
 	}
 }
+
+/*
+=================
+S_PurgeIdleSounds
+
+PSP, when the heap runs low in game: the same as S_PurgeSoundData but
+without stopping anything, sounds a channel is playing stay loaded.
+Returns how many sounds were freed.
+=================
+*/
+static void S_MarkPlaying( byte *playing, const sfx_t *sfx )
+{
+	if( sfx >= s_knownSfx && sfx < s_knownSfx + MAX_SFX )
+		playing[sfx - s_knownSfx] = 1;
+}
+
+int S_PurgeIdleSounds( void )
+{
+	static byte	playing[MAX_SFX];
+	sfx_t	*sfx;
+	int	i, j, count = 0;
+
+	if( !dma.initialized )
+		return 0;
+
+	memset( playing, 0, sizeof( playing ));
+
+	for( i = 0; i < MAX_CHANNELS; i++ )
+	{
+		channel_t *ch = &channels[i];
+
+		if( !ch->sfx )
+			continue;
+
+		S_MarkPlaying( playing, ch->sfx );
+
+		if( !ch->isSentence )
+			continue;
+
+		for( j = 0; j < CVOXWORDMAX; j++ )
+			S_MarkPlaying( playing, ch->words[j].sfx );
+	}
+
+	for( i = 0, sfx = s_knownSfx; i < s_numSfx; i++, sfx++ )
+	{
+		if( playing[i] || !sfx->name[0] || !sfx->cache || !Q_stricmp( sfx->name, "*default" ))
+			continue;
+
+		FS_FreeSound( sfx->cache );
+		sfx->cache = NULL;
+		count++;
+	}
+
+	return count;
+}
 #endif
 
 /*

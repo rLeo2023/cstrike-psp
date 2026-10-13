@@ -187,6 +187,54 @@ with new cls.state
 */
 #if XASH_PSP
 static double psp_reportTime;
+static double psp_memCheckTime;
+static double psp_soundPurgeTime;
+
+#define PSP_LOWMEM_PURGE_KB	2560	// below this, free sounds that aren't playing
+#define PSP_LOWMEM_LEAVE_KB	1024	// still below this, leave the map
+
+/*
+===============
+CL_PSP_CheckLowMemory
+
+a heavy map with many bots can eat the whole heap mid-game, and an
+allocation failing there freezes a real PSP. First give back the sound
+cache, and if that isn't enough leave to the menu with a message.
+===============
+*/
+static void CL_PSP_CheckLowMemory( void )
+{
+	int PSP_HeapFreeKB( void );
+	int S_PurgeIdleSounds( void );
+	void PSP_LogHeapUsage( const char *when );
+	int freeKB, purged;
+
+	if( cls.state != ca_active || host.realtime < psp_memCheckTime )
+		return;
+
+	psp_memCheckTime = host.realtime + 1.0;
+	freeKB = PSP_HeapFreeKB();
+
+	if( freeKB >= PSP_LOWMEM_PURGE_KB )
+		return;
+
+	// reloading sounds costs time and fragments the heap: not too often
+	if( host.realtime >= psp_soundPurgeTime )
+	{
+		psp_soundPurgeTime = host.realtime + 30.0;
+		purged = S_PurgeIdleSounds();
+		PSP_LogHeapUsage( va( "low memory, freed %i sounds", purged ));
+		freeKB = PSP_HeapFreeKB();
+	}
+
+	if( freeKB >= PSP_LOWMEM_LEAVE_KB )
+		return;
+
+	PSP_LogHeapUsage( va( "out of memory on %s, leaving", clgame.mapname ));
+	psp_memCheckTime = host.realtime + 10.0;
+	Cbuf_AddText( va( "disconnect\nmenu_showmessagebox \"Not enough memory for %s with this many bots. Try fewer bots or another map.\"\n",
+		clgame.mapname ));
+}
 #endif
 
 void CL_CheckClientState( void )
@@ -225,6 +273,8 @@ void CL_CheckClientState( void )
 		psp_reportTime = 0;
 		PSP_LogHeapUsage( va( "90 s into %s", clgame.mapname ));
 	}
+
+	CL_PSP_CheckLowMemory();
 #endif
 }
 

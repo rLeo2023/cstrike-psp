@@ -355,6 +355,14 @@ how much of the newlib heap is left, used once a map is fully loaded to
 tell which maps fit and how much room bots would have
 ================
 */
+int PSP_HeapFreeKB( void )
+{
+	struct mallinfo mi = mallinfo();
+	int heap = sce_newlib_heap_kb_size * 1024;
+
+	return (( heap - (int)mi.arena ) + (int)mi.fordblks ) / 1024;
+}
+
 void PSP_LogHeapUsage( const char *when )
 {
 	struct mallinfo mi = mallinfo();

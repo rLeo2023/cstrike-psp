@@ -41,7 +41,19 @@ public:
 	CMenuMain() : CMenuFramework( "CMenuMain" ), isSplashing( true ), splashEndTime( 0.0f ) { }
 
 	bool KeyDown( int key ) override;
+	bool KeyUp( int key ) override
+	{
+		// buttons fire on release: swallow those during the intro too
+		if( IsSplashing() )
+			return true;
+		return CMenuFramework::KeyUp( key );
+	}
 	void Draw() override; // Interceptamos el dibujado para el Splash Screen
+
+	bool IsSplashing() const
+	{
+		return isSplashing && gpGlobals->time < splashEndTime;
+	}
 
 private:
 	void _Init() override;
@@ -172,6 +184,10 @@ CMenuMain::Key
 */
 bool CMenuMain::KeyDown( int key )
 {
+	// the intro picture covers the menu: its buttons must not move or fire
+	if( IsSplashing() )
+		return true;
+
 	if( UI::Key::IsEscape( key ) )
 	{
 		if ( CL_IsActive( ))

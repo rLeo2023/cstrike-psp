@@ -24,6 +24,7 @@ GNU General Public License for more details.
 // it's a Valve default value for LoadMapSprite (probably must be power of two)
 #define MAPSPRITE_SIZE	128
 #define GLARE_FALLOFF	19000.0f
+#define R_SPRITE_MAXDIST	1500.0f	// map sprites farther than this aren't drawn
 
 cvar_t		*r_sprite_lerping;
 cvar_t		*r_sprite_lighting;
@@ -846,6 +847,18 @@ void R_DrawSpriteModel( cl_entity_t *e )
 
 	scale = e->curstate.scale;
 	if( !scale ) scale = 1.0f;
+
+	// the 16-bit depth buffer can't keep far map sprites (lamp glows etc.)
+	// behind the walls they sit on, and they're a few pixels big anyway.
+	// Temp entities (index 0: smoke, explosions) always draw.
+	if( RP_NORMALPASS() && e->index > 0 )
+	{
+		vec3_t	delta;
+
+		VectorSubtract( origin, RI.vieworg, delta );
+		if( DotProduct( delta, delta ) > R_SPRITE_MAXDIST * R_SPRITE_MAXDIST )
+			return;
+	}
 
 	if( R_SpriteOccluded( e, origin, &scale ))
 		return; // sprite culled

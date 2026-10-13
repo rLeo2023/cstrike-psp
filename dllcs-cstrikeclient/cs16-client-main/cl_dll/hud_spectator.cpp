@@ -259,7 +259,11 @@ int CHudSpectator::Init()
 	m_drawstatus	= gEngfuncs.pfnRegisterVariable("spec_drawstatus_internal","1",0);
 	m_autoDirector	= gEngfuncs.pfnRegisterVariable("spec_autodirector_internal","1",0);
 	m_HUD_saytext 	= gEngfuncs.pfnRegisterVariable("hud_saytext_internal","1",0);
+#ifdef __PSP__
+	m_pip			= gEngfuncs.pfnRegisterVariable("spec_pip_internal","0",0);
+#else
 	m_pip			= gEngfuncs.pfnRegisterVariable("spec_pip_internal","1",0);
+#endif
 	m_lastAutoDirector = 0.0f;
 	
 	if ( !m_drawnames || !m_drawcone || !m_drawstatus || !m_autoDirector || !m_pip )
@@ -837,10 +841,14 @@ void CHudSpectator::HandleButtonsDown( int ButtonPressed )
 	}
 
 	//  'Use' changes inset window mode
+#ifndef __PSP__
+	// on PSP the inset window renders the world a second time into a small
+	// box, and d-pad right (+usereload) toggled it by accident
 	if ( ButtonPressed & IN_USE )
 	{
 		newInsetMode = ToggleInset(true);
 	}
+#endif
 
 	// if not in HLTV mode, buttons are handled server side
 	if ( gEngfuncs.IsSpectateOnly() )
@@ -929,6 +937,11 @@ void CHudSpectator::SetModes(int iNewMainMode, int iNewInsetMode)
 
 	if ( iNewInsetMode == -1 )
 		iNewInsetMode = m_pip->value;
+
+#ifdef __PSP__
+	// no inset view on PSP (see HandleButtonsDown)
+	iNewInsetMode = INSET_OFF;
+#endif
 
 	// inset mode is handled only clients side
 	m_pip->value = iNewInsetMode;

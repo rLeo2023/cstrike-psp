@@ -62,6 +62,25 @@ Vector CBot::GetAutoaimVector(float flDelta)
 	return gpGlobals->v_forward;
 }
 
+#ifdef __PSP__
+// With many bots their full think (vision, paths, decisions) is most of the
+// server's CPU time: from 8 bots up it runs 8 times a second instead of 10.
+// Aiming (Upkeep) and movement commands keep their 30 Hz.
+static float BotFullThinkInterval()
+{
+	static float lastTime = -1.0f;
+	static int botCount = 0;
+
+	if (gpGlobals->time != lastTime)
+	{
+		lastTime = gpGlobals->time;
+		botCount = UTIL_BotsInGame();
+	}
+
+	return (botCount >= 8) ? (1.0f / 8.0f) : g_flBotFullThinkInterval;
+}
+#endif
+
 void CBot::BotThink()
 {
 	if (gpGlobals->time >= m_flNextBotThink)
@@ -72,7 +91,11 @@ void CBot::BotThink()
 
 		if (gpGlobals->time >= m_flNextFullBotThink)
 		{
+#ifdef __PSP__
+			m_flNextFullBotThink = gpGlobals->time + BotFullThinkInterval();
+#else
 			m_flNextFullBotThink = gpGlobals->time + g_flBotFullThinkInterval;
+#endif
 
 			ResetCommand();
 			Update();

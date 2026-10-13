@@ -184,7 +184,8 @@ int CHudSpectatorGui::Draw( float flTime )
 	if( gHUD.m_Spectator.m_pip->value != INSET_OFF ) // pip adjust
 	{
 		startpos = XRES(gHUD.m_Spectator.m_OverviewData.insetWindowWidth) + XRES(gHUD.m_Spectator.m_OverviewData.insetWindowX);
-		startpos *= ScreenWidth / TrueWidth; // hud_scale adjust
+		if( TrueWidth > 0 )
+			startpos = startpos * ScreenWidth / TrueWidth; // hud_scale adjust
 	}
 	FillRGBABlend(startpos, 0, ScreenWidth - startpos, INT_YPOS(2), 0, 0, 0, 153);
 	FillRGBABlend(0, ScreenHeight - INT_YPOS(2), ScreenWidth, INT_YPOS(2), 0, 0, 0, 153);

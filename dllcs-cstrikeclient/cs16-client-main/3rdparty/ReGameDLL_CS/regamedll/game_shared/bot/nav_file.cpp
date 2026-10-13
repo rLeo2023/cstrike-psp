@@ -483,6 +483,34 @@ void CNavArea::Load(SteamFile *file, unsigned int version)
 	unsigned int count;
 	file->Read(&count, sizeof(unsigned int));
 
+#ifdef __PSP__
+	// encounter spots (where to look while walking from one area to the next)
+	// are most of a .nav in memory: ~1.5 MB on dust2, ~2 MB on cs_italy.
+	// Bots still see and fight without them, every user checks for nullptr.
+	if (version >= 3)
+	{
+		for (unsigned int e = 0; e < count; e++)
+		{
+			unsigned char skip[10]; // from id, dir, to id, dir
+			file->Read(skip, sizeof(skip));
+
+			unsigned char spotCount = 0;
+			file->Read(&spotCount, sizeof(unsigned char));
+
+			for (int s = 0; s < spotCount; s++)
+				file->Read(skip, 5); // spot id, t
+		}
+
+		if (version >= NAV_VERSION)
+		{
+			PlaceDirectory::EntryType entry;
+			file->Read(&entry, sizeof(entry));
+			SetPlace(placeDirectory.EntryToPlace(entry));
+		}
+		return;
+	}
+#endif
+
 	if (version < 3)
 	{
 		// old data, read and discard

@@ -60,17 +60,22 @@ El resultado queda en `build/engine/EBOOT.PBP` y `build/engine/xash.prx`.
 |---|---|
 | Analógico | Moverse |
 | △ / ✕ / □ / ○ | Mirar arriba / abajo / izquierda / derecha |
-| Cruceta ↑ / ↓ | Saltar / agacharse (un toque y quedás agachado, otro y te parás) |
+| R | Disparar |
+| L (toque corto) | Ataque secundario (zoom, silenciador, ráfaga, puñalada) |
+| L + ✕ | Saltar |
+| L + ○ | Agacharse mientras lo mantenés |
+| L + □ / L + △ | Arma anterior / tirar arma |
+| L + ↑ / L + R | Granadas / cuchillo |
+| Cruceta ↓ | Agacharse (un toque y quedás agachado, otro y te parás) |
 | Cruceta ← / → | Siguiente arma / usar y recargar |
-| R / L | Disparar / ataque secundario |
-| SELECT (toque corto) | Menú de compra (incluye "9. Autobuy", según `autobuy.txt`) |
-| SELECT + ← / ✕ / □ / ○ / R | Tirar arma / última arma / granadas / cambiar de equipo / cuchillo |
+| Cruceta ↑ | Cambiar de equipo |
+| SELECT | Menú de compra (incluye "9. Autobuy", según `autobuy.txt`) |
 | START | Menú |
 
 En los menús de texto: cruceta ↑/↓ mueve el cursor, ✕ elige, ○ cierra.
 Los botones se cambian en `cstrike/userconfig.cfg`. La velocidad de cámara, invertir la vista, la
-velocidad y zona muerta del analógico, la ayuda de apuntado y la mira están en Options → Controls.
-La configuración se guarda al salir de cada página de opciones y con Options → Save settings.
+velocidad y zona muerta del analógico, la ayuda de apuntado y la mira están en Options → Controls, y
+el nombre del jugador en Options → Player name (teclado en pantalla: cruceta y ✕). La configuración se guarda al salir de cada página de opciones y con Options → Save settings.
 
 ## Multijugador ad-hoc
 
@@ -91,10 +96,17 @@ el servidor PRO ad-hoc integrado activado solo en una de las dos.
   22 kHz y cargados al primer uso; malla de navegación de los bots leída por partes y cargada solo si
   hay bots; carga de modelos sin copias intermedias; menos historial de entidades, efectos
   temporales, partículas y haces; sin radar; los cadáveres desaparecen después de la animación de
-  muerte. Dust2 5v5 deja ~7 MB libres.
+  muerte; mallas de navegación cargadas sin los "encounter spots" (~1,5-2 MB por mapa). Dust2 5v5
+  deja ~7 MB libres.
+- **Memoria baja**: si en una partida queda poca memoria, se liberan los sonidos que no están sonando
+  (se vuelven a cargar cuando hacen falta); si no alcanza, el juego vuelve al menú con un mensaje en
+  vez de congelar la consola.
 - **Render**: recorte por software de los triángulos del arma en primera persona; arreglo de las caras
   ocultas con `cl_righthand 1`; mira visible con `hud_scale` < 1; límite de 45 fps que duerme en vez
-  de esperar en un bucle (ahorra batería).
+  de esperar en un bucle (ahorra batería); los sprites del mapa a más de 1500 unidades no se dibujan
+  (el buffer de profundidad de 16 bits los dejaba ver a través de las paredes); sin la ventanita del
+  modo espectador.
+- **Bots**: con 8 bots o más, su lógica completa corre 8 veces por segundo en vez de 10.
 - **Juego**: menús de texto con cursor para el gamepad (selección de equipo, compra), autobuy en el
   menú de compra, menú de partida con mapa, cantidad de bots y dificultad (Easy / Medium), ayuda de
   apuntado, página de controles para PSP, configuración que se guarda en el momento, textos de ayuda
@@ -108,7 +120,9 @@ el servidor PRO ad-hoc integrado activado solo en una de las dos.
 
 ## Problemas conocidos
 
-- Mapas grandes pueden no entrar en memoria, sobre todo como segundo o tercer mapa de la sesión.
+- Mapas grandes pueden no entrar en memoria, sobre todo como segundo o tercer mapa de la sesión. Con
+  muchos bots en un mapa pesado el juego puede volver al menú con el mensaje "Not enough memory":
+  usá menos bots.
 - El ad-hoc está probado en PPSSPP; se agradecen pruebas en PSP reales.
 - Con muchos bots (4v4, 5v5) bajan los fps en los momentos con mucha acción.
 
