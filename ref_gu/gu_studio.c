@@ -3973,6 +3973,12 @@ static void R_DrawStudioModelInternal( cl_entity_t *e )
 	if( FBitSet( RI.params, RP_ENVVIEW ))
 		return;
 
+	// the vertices go into the frame's display list: with it nearly full
+	// leave the model out of this frame rather than write past its end
+	// (a player with its weapon takes well under 128 KB)
+	if( sceGuCheckList() > (int)guRender.context_list_size - 0x20000 )
+		return;
+
 	R_StudioSetupTimings();
 
 	if( e->player )

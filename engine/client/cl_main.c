@@ -299,6 +299,11 @@ static void CL_PSP_PerfReport( void )
 	}
 	else Cbuf_AddText( "r_psp_report\n" );
 
+	{
+		void PSP_LogHeapUsage( const char *when );
+		PSP_LogHeapUsage( "heap" );
+	}
+
 	CL_PSP_PerfReset();
 }
 #endif

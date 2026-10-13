@@ -4,7 +4,7 @@
 
 Port de Counter-Strike 1.6 a la PSP sobre el motor [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs),
 partiendo del port de PSP de [Crow-bar](https://github.com/Crow-bar/xash3d-fwgs).
-Se juega contra bots, hasta 5 contra 5, solo o con un amigo por ad-hoc, y anda en PSP y en PPSSPP.
+Se juega contra hasta 15 bots, solo o con un amigo por ad-hoc, y anda en PSP y en PPSSPP.
 
 Este repositorio contiene **solo código y configuración**. No incluye ningún archivo del juego
 (mapas, modelos, sonidos, texturas): hace falta una copia legal de Counter-Strike 1.6.
@@ -64,11 +64,12 @@ El resultado queda en `build/engine/EBOOT.PBP` y `build/engine/xash.prx`.
 | L (toque corto) | Ataque secundario (zoom, silenciador, ráfaga, puñalada) |
 | L + ✕ | Saltar |
 | L + ○ | Agacharse mientras lo mantenés |
-| L + □ / L + △ | Arma anterior / tirar arma |
+| L + □ / L + △ | Última arma usada / tirar arma |
 | L + ↑ / L + R | Granadas / cuchillo |
+| L + SELECT | Cambiar de equipo |
 | Cruceta ↓ | Agacharse (un toque y quedás agachado, otro y te parás) |
 | Cruceta ← / → | Siguiente arma / usar y recargar |
-| Cruceta ↑ | Cambiar de equipo |
+| Cruceta ↑ | Tabla de puntajes (mientras la mantenés) |
 | SELECT | Menú de compra (incluye "9. Autobuy", según `autobuy.txt`) |
 | START | Menú |
 
@@ -76,6 +77,15 @@ En los menús de texto: cruceta ↑/↓ mueve el cursor, ✕ elige, ○ cierra.
 Los botones se cambian en `cstrike/userconfig.cfg`. La velocidad de cámara, invertir la vista, la
 velocidad y zona muerta del analógico, la ayuda de apuntado y la mira están en Options → Controls, y
 el nombre del jugador en Options → Player name (teclado en pantalla: cruceta y ✕). La configuración se guarda al salir de cada página de opciones y con Options → Save settings.
+
+## Fps
+
+Options → Video tiene dos modos, los dos sincronizados con el refresco de la pantalla para que la
+imagen nunca se corte (sin tearing):
+
+- **30 FPS** (por defecto): 30 fijos y parejos, gasta menos batería.
+- **60 FPS**: desbloquea hasta 60. Pensado para PPSSPP, la PSP enchufada o partidas con pocos bots;
+  con muchos bots baja a 30 en los momentos con mucha acción.
 
 ## Multijugador ad-hoc
 
@@ -96,17 +106,26 @@ el servidor PRO ad-hoc integrado activado solo en una de las dos.
   22 kHz y cargados al primer uso; malla de navegación de los bots leída por partes y cargada solo si
   hay bots; carga de modelos sin copias intermedias; menos historial de entidades, efectos
   temporales, partículas y haces; sin radar; los cadáveres desaparecen después de la animación de
-  muerte; mallas de navegación cargadas sin los "encounter spots" (~1,5-2 MB por mapa). Dust2 5v5
-  deja ~7 MB libres.
+  muerte; mallas de navegación cargadas sin los "encounter spots" (~1,5-2 MB por mapa); el segundo
+  modelo de jugador usa las animaciones que tiene idénticas byte por byte al primero (~1,9 MB);
+  buffers de red solo para jugadores reales, no para bots (~128 KB por bot); polígonos y bevels de
+  colisión del mapa en un bloque cada uno en vez de ~5000 chicos; modelos de jugador y armas
+  conservados entre mapas. Dust2 con 15 bots llega a ~27 MB de los 40 MB del heap.
 - **Memoria baja**: si en una partida queda poca memoria, se liberan los sonidos que no están sonando
   (se vuelven a cargar cuando hacen falta); si no alcanza, el juego vuelve al menú con un mensaje en
   vez de congelar la consola.
 - **Render**: recorte por software de los triángulos del arma en primera persona; arreglo de las caras
-  ocultas con `cl_righthand 1`; mira visible con `hud_scale` < 1; límite de 45 fps que duerme en vez
-  de esperar en un bucle (ahorra batería); los sprites del mapa a más de 1500 unidades no se dibujan
-  (el buffer de profundidad de 16 bits los dejaba ver a través de las paredes); sin la ventanita del
-  modo espectador.
-- **Bots**: con 8 bots o más, su lógica completa corre 8 veces por segundo en vez de 10.
+  ocultas con `cl_righthand 1`; mira visible con `hud_scale` < 1; modos de 30 / 60 fps sincronizados
+  con el refresco de la pantalla; los sprites del mapa a más de 1500 unidades no se dibujan (el
+  buffer de profundidad de 16 bits los dejaba ver a través de las paredes); sin la ventanita del
+  modo espectador; tabla de puntajes compacta que entra en la pantalla.
+- **Velocidad**: las cuentas de animación de los jugadores usan la VFPU en vez de doble precisión
+  emulada por software (la FPU de la PSP no tiene doubles), los jugadores fuera de cámara se
+  descartan antes de animarlos, y la lista de dibujo está protegida contra desbordes con muchos
+  jugadores en pantalla.
+- **Bots**: su lógica completa corre 10 veces por segundo, 8 con 8 bots o más y 6 con 12 o más,
+  repartida entre los frames para que no piensen todos a la vez; el tiempo de reacción respeta la
+  frecuencia real.
 - **Juego**: menús de texto con cursor para el gamepad (selección de equipo, compra), autobuy en el
   menú de compra, menú de partida con mapa, cantidad de bots y dificultad (Easy / Medium), ayuda de
   apuntado, página de controles para PSP, configuración que se guarda en el momento, textos de ayuda
@@ -124,7 +143,8 @@ el servidor PRO ad-hoc integrado activado solo en una de las dos.
   muchos bots en un mapa pesado el juego puede volver al menú con el mensaje "Not enough memory":
   usá menos bots.
 - El ad-hoc está probado en PPSSPP; se agradecen pruebas en PSP reales.
-- Con muchos bots (4v4, 5v5) bajan los fps en los momentos con mucha acción.
+- Con muchos bots bajan los fps en los momentos con mucha acción, más en el modo 60 FPS.
+- La primera vez que suena un arma su sonido se lee de la memory stick, y puede haber un tirón corto.
 
 ## Créditos y licencias
 

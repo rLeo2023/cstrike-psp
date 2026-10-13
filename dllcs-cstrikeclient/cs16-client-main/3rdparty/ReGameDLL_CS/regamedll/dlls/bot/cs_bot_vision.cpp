@@ -1075,14 +1075,24 @@ void CCSBot::UpdateReactionQueue()
 	if (m_enemyQueueCount < MAX_ENEMY_QUEUE)
 		m_enemyQueueCount++;
 
+#ifdef __PSP__
+	// one queue entry per full think, and on PSP those can be 1/8 or 1/6 s
+	// apart (bot.cpp): counted in 1/10 s steps the bots reacted up to 1.7
+	// times slower than their profile says
+	extern float BotFullThinkInterval();
+	const float thinkInterval = BotFullThinkInterval();
+#else
+	const float thinkInterval = g_flBotFullThinkInterval;
+#endif
+
 	// clamp reaction time to enemy queue size
 	float reactionTime = GetProfile()->GetReactionTime();
-	float maxReactionTime = (MAX_ENEMY_QUEUE * g_flBotFullThinkInterval) - 0.01f;
+	float maxReactionTime = (MAX_ENEMY_QUEUE * thinkInterval) - 0.01f;
 	if (reactionTime > maxReactionTime)
 		reactionTime = maxReactionTime;
 
 	// "rewind" time back to our reaction time
-	int reactionTimeSteps = int((reactionTime / g_flBotFullThinkInterval) + 0.5f);
+	int reactionTimeSteps = int((reactionTime / thinkInterval) + 0.5f);
 
 	int i = now - reactionTimeSteps;
 	if (i < 0)

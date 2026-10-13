@@ -93,6 +93,15 @@ static void Mod_FreeUserData( model_t *mod )
 #endif
 }
 
+#if XASH_PSP
+// the loaded models list for mod_studio.c (shared player animations),
+// NULL past the end
+model_t *Mod_PSPKnownModel( int i )
+{
+	return ( i >= 0 && i < mod_numknown ) ? &mod_known[i] : NULL;
+}
+#endif
+
 /*
 ================
 Mod_FreeModel
@@ -103,6 +112,14 @@ void Mod_FreeModel( model_t *mod )
 	// already freed?
 	if( !mod || !mod->name[0] )
 		return;
+
+#if XASH_PSP
+	if( mod->type == mod_studio )
+	{
+		void Mod_StudioUnshare( model_t *mod );
+		Mod_StudioUnshare( mod ); // shared player animations (mod_studio.c)
+	}
+#endif
 
 	if( mod->type != mod_brush || mod->name[0] != '*' )
 	{

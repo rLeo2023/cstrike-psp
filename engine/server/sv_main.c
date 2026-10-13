@@ -1015,6 +1015,12 @@ void SV_FreeClients( void )
 		// free server static data
 		if( svs.clients )
 		{
+#if XASH_PSP
+			int	i;
+
+			for( i = 0; i < svs.maxclients; i++ )
+				Netchan_FreeBuffers( &svs.clients[i].netchan );
+#endif
 			Z_Free( svs.clients );
 			svs.clients = NULL;
 		}

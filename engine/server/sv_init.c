@@ -772,7 +772,15 @@ void SV_SetupClients( void )
 #endif
 
 	svs.clients = Z_Realloc( svs.clients, sizeof( sv_client_t ) * svs.maxclients );
+#if XASH_PSP
+	// the pool only holds the entity snapshots sent to real players, bots
+	// get none: size it for 2 (local player + the one ad-hoc player the
+	// menu allows), not for every slot. Was 1.7 MB with 10 players. A delta
+	// whose old frame got overwritten is sent as a full update (sv_frame.c)
+	svs.num_client_entities = Q_min( svs.maxclients, 2 ) * SV_UPDATE_BACKUP * NUM_PACKET_ENTITIES;
+#else
 	svs.num_client_entities = svs.maxclients * SV_UPDATE_BACKUP * NUM_PACKET_ENTITIES;
+#endif
 	svs.packet_entities = Z_Realloc( svs.packet_entities, sizeof( entity_state_t ) * svs.num_client_entities );
 	Con_Reportf( "%s alloced by server packet entities\n", Q_memprint( sizeof( entity_state_t ) * svs.num_client_entities ));
 

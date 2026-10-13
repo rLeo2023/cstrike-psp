@@ -127,6 +127,11 @@ qboolean NetSplit_GetLong( netsplit_t *ns, netadr_t *from, byte *data, size_t *l
 	//ASSERT( *length > NETSPLIT_HEADER_SIZE );
 	if( *length <= NETSPLIT_HEADER_SIZE ) return false;
 
+#if XASH_PSP
+	if( !ns->packets )
+		ns->packets = Mem_Calloc( net_mempool, sizeof( netsplit_chain_packet_t ) * NETSPLIT_BACKUP );
+#endif
+
 	LittleLongSW(packet->id);
 	LittleLongSW(packet->length);
 	LittleLongSW(packet->part);
@@ -304,10 +309,27 @@ called to open a channel to a remote system
 */
 void Netchan_Setup( netsrc_t sock, netchan_t *chan, netadr_t adr, int qport, void *client, int (*pfnBlockSize)(void *, fragsize_t mode ))
 {
+#if XASH_PSP
+	// the buffers survive the wipe below, a reused channel keeps its own
+	byte			*bufs = chan->message_buf;
+	netsplit_chain_packet_t	*split = chan->netsplit.packets;
+#endif
+
 	Netchan_Clear( chan );
 
 	memset( chan, 0, sizeof( *chan ));
-	
+
+#if XASH_PSP
+	if( !bufs )
+		bufs = Mem_Malloc( net_mempool, NET_MAX_MESSAGE * 2 );
+	chan->message_buf = bufs;
+	chan->reliable_buf = bufs + NET_MAX_MESSAGE;
+
+	if( split )
+		memset( split, 0, sizeof( netsplit_chain_packet_t ) * NETSPLIT_BACKUP );
+	chan->netsplit.packets = split;
+#endif
+
 	chan->sock = sock;
 	chan->remote_address = adr;
 	chan->last_received = host.realtime;
@@ -319,8 +341,33 @@ void Netchan_Setup( netsrc_t sock, netchan_t *chan, netadr_t adr, int qport, voi
 	chan->client = client;
 	chan->pfnBlockSize = pfnBlockSize;
 
+#if XASH_PSP
+	MSG_Init( &chan->message, "NetData", chan->message_buf, NET_MAX_MESSAGE );
+#else
 	MSG_Init( &chan->message, "NetData", chan->message_buf, sizeof( chan->message_buf ));
+#endif
 }
+
+#if XASH_PSP
+/*
+==============
+Netchan_FreeBuffers
+
+a server slot that turns into a bot, or the server shutting down
+==============
+*/
+void Netchan_FreeBuffers( netchan_t *chan )
+{
+	if( chan->message_buf )
+		Mem_Free( chan->message_buf );
+	if( chan->netsplit.packets )
+		Mem_Free( chan->netsplit.packets );
+
+	chan->message_buf = chan->reliable_buf = NULL;
+	chan->netsplit.packets = NULL;
+	MSG_Init( &chan->message, "NetData", NULL, 0 );
+}
+#endif
 
 /*
 ==============================
@@ -1561,7 +1608,11 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 				}
 
 				// copy frag stuff on top of current buffer
+#if XASH_PSP
+				MSG_StartWriting( &temp, chan->reliable_buf, NET_MAX_MESSAGE, chan->reliable_length, -1 );
+#else
 				MSG_StartWriting( &temp, chan->reliable_buf, sizeof( chan->reliable_buf ), chan->reliable_length, -1 );
+#endif
 				MSG_WriteBits( &temp, MSG_GetData( &pbuf->frag_message ), MSG_GetNumBitsWritten( &pbuf->frag_message ));
 				chan->reliable_length += MSG_GetNumBitsWritten( &pbuf->frag_message );
 				chan->frag_length[i] = MSG_GetNumBitsWritten( &pbuf->frag_message );

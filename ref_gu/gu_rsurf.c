@@ -280,6 +280,19 @@ void GL_SubdivideSurface( msurface_t *fa )
 	SubdividePolygon_r( fa, numverts, verts[0] );
 }
 
+// one block for all the polygons of a map (GL_BuildLightmaps) instead of one
+// per surface: dust2 has 5383 and the allocator's header on each ~190 byte
+// polygon added a good share to them
+static byte	*poly_arena;
+static size_t	poly_arena_left;
+
+static size_t GL_PolygonSize( int numverts )
+{
+	// 8 byte multiple: the GE reads the vertices straight from here, keep
+	// the alignment a block of its own had
+	return ( sizeof( glpoly_t ) + ( numverts * 2 - 1 ) * sizeof( gu_vert_t ) + 7 ) & ~7;
+}
+
 /*
 ================
 GL_BuildPolygonFromSurface
@@ -324,7 +337,20 @@ void GL_BuildPolygonFromSurface( model_t *mod, msurface_t *fa )
 
 	// quake simple models (healthkits etc) need to be reconstructed their polys because LM coords has changed after the map change
 	// PSP GU-friendly format s1t1 xyz s2t2 xyz (Idea from PSP Quake)
-	poly = Mem_Realloc( mod->mempool, poly, sizeof( glpoly_t ) + ( lnumverts * 2 - 1 ) * sizeof( gu_vert_t ));
+	// A rebuilt polygon has the same number of edges, so it is reused as
+	// it is (it may sit inside poly_arena, which can't be reallocated)
+	if( !poly )
+	{
+		size_t	size = GL_PolygonSize( lnumverts );
+
+		if( poly_arena && size <= poly_arena_left )
+		{
+			poly = (glpoly_t *)poly_arena; // already zeroed
+			poly_arena += size;
+			poly_arena_left -= size;
+		}
+		else poly = Mem_Calloc( mod->mempool, size );
+	}
 	poly->next = fa->polys;
 	poly->flags = fa->flags;
 	fa->polys = poly;
@@ -2304,6 +2330,22 @@ void GL_BuildLightmaps( void )
 		if( m->name[0] == '*' || m->type != mod_brush )
 			continue;
 
+		// the polygons this model doesn't have yet, in one block
+		{
+			size_t	total = 0;
+
+			for( j = 0; j < m->numsurfaces; j++ )
+			{
+				msurface_t	*s = m->surfaces + j;
+
+				if( !s->polys && !FBitSet( s->flags, SURF_DRAWTURB ) && s->texinfo && s->texinfo->texture )
+					total += GL_PolygonSize( s->numedges );
+			}
+
+			poly_arena = total ? Mem_Calloc( m->mempool, total ) : NULL;
+			poly_arena_left = total;
+		}
+
 		for( j = 0; j < m->numsurfaces; j++ )
 		{
 			// clearing all decal chains
@@ -2317,6 +2359,9 @@ void GL_BuildLightmaps( void )
 
 			GL_BuildPolygonFromSurface( m, m->surfaces + j );
 		}
+
+		poly_arena = NULL;
+		poly_arena_left = 0;
 
 		// clearing visframe
 		for( j = 0; j < m->numleafs; j++ )

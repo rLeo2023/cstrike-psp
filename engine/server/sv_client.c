@@ -496,6 +496,9 @@ edict_t *SV_FakeConnect( const char *netname )
 	sv.current_client = cl;
 
 	if( cl->frames ) Mem_Free( cl->frames );	// fakeclients doesn't have frames
+#if XASH_PSP
+	Netchan_FreeBuffers( &cl->netchan );	// nor a channel: a player used this slot before
+#endif
 	memset( cl, 0, sizeof( sv_client_t ));
 
 	cl->edict = EDICT_NUM( (cl - svs.clients) + 1 );

@@ -64,9 +64,9 @@ Vector CBot::GetAutoaimVector(float flDelta)
 
 #ifdef __PSP__
 // With many bots their full think (vision, paths, decisions) is most of the
-// server's CPU time: from 8 bots up it runs 8 times a second instead of 10.
-// Aiming (Upkeep) and movement commands keep their 30 Hz.
-static float BotFullThinkInterval()
+// server's CPU time: from 8 bots up it runs 8 times a second instead of 10,
+// from 12 up 6 times. Aiming (Upkeep) and movement commands keep their 30 Hz.
+static int BotCountThisFrame()
 {
 	static float lastTime = -1.0f;
 	static int botCount = 0;
@@ -77,7 +77,48 @@ static float BotFullThinkInterval()
 		botCount = UTIL_BotsInGame();
 	}
 
-	return (botCount >= 8) ? (1.0f / 8.0f) : g_flBotFullThinkInterval;
+	return botCount;
+}
+
+// full thinks per second for the current bot count
+static int BotFullThinkRate()
+{
+	int bots = BotCountThisFrame();
+
+	if (bots >= 12)
+		return 6;
+	if (bots >= 8)
+		return 8;
+	return 10;
+}
+
+float BotFullThinkInterval()
+{
+	return 1.0f / BotFullThinkRate();
+}
+
+// The full thinks drift together over time (each one is scheduled from the
+// frame it ran in), and 9 of them in one frame are a ~10 ms hitch. Only a
+// share of them per server frame, the rest wait for their next command
+// tick: what the bots need on average at 30 fps plus one, so nobody falls
+// behind (9 bots: 4 per frame, 15 bots: 4)
+static bool BotFullThinkAllowed()
+{
+	static float frameTime = -1.0f;
+	static int thinks = 0;
+	int maxThinks = 1 + (BotCountThisFrame() * BotFullThinkRate() + 29) / 30;
+
+	if (gpGlobals->time != frameTime)
+	{
+		frameTime = gpGlobals->time;
+		thinks = 0;
+	}
+
+	if (thinks >= maxThinks)
+		return false;
+
+	thinks++;
+	return true;
 }
 #endif
 
@@ -89,7 +130,11 @@ void CBot::BotThink()
 
 		Upkeep();
 
+#ifdef __PSP__
+		if (gpGlobals->time >= m_flNextFullBotThink && BotFullThinkAllowed())
+#else
 		if (gpGlobals->time >= m_flNextFullBotThink)
+#endif
 		{
 #ifdef __PSP__
 			m_flNextFullBotThink = gpGlobals->time + BotFullThinkInterval();

@@ -84,9 +84,10 @@ gurender_t	guRender;
 #define PSP_FB_BPP			4
 #endif
 
-// a frame's display list measured at most ~400 KB (dust, cs_siege, 9 bots);
-// 1 MB of static RAM was mostly unused. "r_psp_report" logs the biggest one
-#define PSP_GU_LIST_SIZE	0xA0000 // 640 KB
+// a frame's display list measured ~400 KB with 9 bots but 539 KB with 15
+// (11 players in view), so it stays at 1 MB. "r_psp_report" logs the
+// biggest one; R_DrawStudioModel stops adding models when it nears full
+#define PSP_GU_LIST_SIZE	0x100000 // 1 MB
 
 static byte context_list[PSP_GU_LIST_SIZE] __attribute__( ( aligned( 64 ) ) );
 

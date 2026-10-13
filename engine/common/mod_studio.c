@@ -1033,6 +1033,289 @@ studiohdr_t *R_StudioLoadHeader( model_t *mod, const void *buffer )
 	return (studiohdr_t *)buffer;
 }
 
+#if XASH_PSP
+/*
+=================
+Shared player animations
+
+The CS player models are compiled from the same animations: terror.mdl and
+gign.mdl have 107 of their 111 sequences byte for byte the same, ~1.9 MB
+of their ~2 MB each. A player model loaded after another one keeps only
+the sequences that differ, the others point (animindex is an offset from
+the header, any distance works) into the model loaded first. Only exact
+copies are shared, so nothing changes on screen. The model lending its
+animations takes the borrower with it when freed (Mod_StudioUnshare).
+=================
+*/
+#define MAX_ANIM_SHARES	8
+
+model_t *Mod_PSPKnownModel( int i ); // model.c
+
+static struct
+{
+	model_t	*dep;	// uses animations of src
+	model_t	*src;
+} anim_shares[MAX_ANIM_SHARES];
+
+// bytes from the sequence's mstudioanim_t array to the end of its last
+// value stream, -1 if the data doesn't make sense
+static int Mod_StudioSeqAnimSize( studiohdr_t *hdr, mstudioseqdesc_t *seq )
+{
+	mstudioanim_t	*anim = (mstudioanim_t *)((byte *)hdr + seq->animindex);
+	int		count = seq->numblends * hdr->numbones;
+	int		end = count * sizeof( mstudioanim_t );
+	int		i, j;
+
+	for( i = 0; i < count; i++ )
+	{
+		for( j = 0; j < 6; j++ )
+		{
+			mstudioanimvalue_t	*v;
+			int		covered = 0;
+
+			if( !anim[i].offset[j] )
+				continue;
+
+			v = (mstudioanimvalue_t *)((byte *)&anim[i] + anim[i].offset[j] );
+			while( covered < seq->numframes )
+			{
+				if( v->num.total == 0 )
+					return -1;
+				covered += v->num.total;
+				v += v->num.valid + 1;
+			}
+
+			end = Q_max( end, (int)((byte *)v - (byte *)anim ));
+		}
+	}
+
+	return end;
+}
+
+static qboolean Mod_StudioIsBorrower( const model_t *mod )
+{
+	int	i;
+
+	for( i = 0; i < MAX_ANIM_SHARES; i++ )
+		if( anim_shares[i].dep == mod )
+			return true;
+	return false;
+}
+
+#define SHIFT_OFS( x )	if(( x ) >= hi ) ( x ) += delta
+
+static studiohdr_t *Mod_StudioShareAnims( model_t *mod, studiohdr_t *hdr )
+{
+	studiohdr_t	*src = NULL, *out;
+	mstudioseqdesc_t	*seq, *srcseq, *outseq;
+	model_t		*srcmod = NULL;
+	int		size[MAXSTUDIOSEQUENCES];
+	qboolean	shared[MAXSTUDIOSEQUENCES];
+	int		i, j, k, slot, lo, hi, kept, newlength, delta, pos, nshared = 0;
+
+	if( Q_strnicmp( mod->name, "models/player/", 14 ) || hdr->numseqgroups != 1
+		|| hdr->numseq <= 0 || hdr->numseq > MAXSTUDIOSEQUENCES || hdr->studiohdr2index )
+		return hdr;
+
+	for( slot = 0; slot < MAX_ANIM_SHARES && anim_shares[slot].dep; slot++ );
+	if( slot == MAX_ANIM_SHARES )
+		return hdr;
+
+	// a loaded player model with the same layout that owns its animations
+	for( i = 0; Mod_PSPKnownModel( i ); i++ )
+	{
+		model_t		*m = Mod_PSPKnownModel( i );
+		studiohdr_t	*h = (studiohdr_t *)m->cache.data;
+
+		if( m == mod || m->type != mod_studio || !h || Q_strnicmp( m->name, "models/player/", 14 ))
+			continue;
+		if( Mod_StudioIsBorrower( m ) || h->numseqgroups != 1 )
+			continue;
+		if( h->numbones != hdr->numbones || h->numseq != hdr->numseq )
+			continue;
+		src = h;
+		srcmod = m;
+		break;
+	}
+
+	if( !src )
+		return hdr;
+
+	// which sequences are exact copies, and where the animation data is
+	seq = (mstudioseqdesc_t *)((byte *)hdr + hdr->seqindex);
+	srcseq = (mstudioseqdesc_t *)((byte *)src + src->seqindex);
+	lo = hdr->length;
+	hi = 0;
+	kept = 0;
+
+	for( i = 0; i < hdr->numseq; i++ )
+	{
+		int	srcsize;
+
+		if( seq[i].seqgroup != 0 || srcseq[i].seqgroup != 0 )
+			return hdr;
+
+		size[i] = Mod_StudioSeqAnimSize( hdr, &seq[i] );
+		srcsize = Mod_StudioSeqAnimSize( src, &srcseq[i] );
+		if( size[i] < 0 || srcsize < 0 )
+			return hdr;
+
+		lo = Q_min( lo, seq[i].animindex );
+		hi = Q_max( hi, seq[i].animindex + size[i] );
+
+		shared[i] = ( size[i] == srcsize && seq[i].numblends == srcseq[i].numblends
+			&& seq[i].numframes == srcseq[i].numframes
+			&& !memcmp((byte *)hdr + seq[i].animindex, (byte *)src + srcseq[i].animindex, size[i] ));
+
+		if( shared[i] ) nshared++;
+		else kept += size[i];
+	}
+
+	// only when the animations are one block with nothing else inside
+	if( hi > hdr->length || lo >= hi || ( hi - lo ) - kept < 64 * 1024 )
+		return hdr;
+
+	{
+		int	ofs[] = { hdr->boneindex, hdr->bonecontrollerindex, hdr->hitboxindex, hdr->seqindex,
+			hdr->seqgroupindex, hdr->textureindex, hdr->skinindex, hdr->bodypartindex,
+			hdr->attachmentindex, hdr->soundindex, hdr->soundgroupindex, hdr->transitionindex };
+
+		for( i = 0; i < (int)( sizeof( ofs ) / sizeof( ofs[0] )); i++ )
+			if( ofs[i] > lo && ofs[i] < hi )
+				return hdr;
+
+		for( i = 0; i < hdr->numseq; i++ )
+		{
+			if(( seq[i].eventindex > lo && seq[i].eventindex < hi )
+				|| ( seq[i].pivotindex > lo && seq[i].pivotindex < hi ))
+				return hdr;
+		}
+	}
+
+	// new block: everything before the animations, the sequences that
+	// differ, everything after
+	newlength = hdr->length - ( hi - lo ) + kept;
+	delta = newlength - hdr->length;
+	out = Mem_Malloc( mod->mempool, newlength ); // mod is loadmodel, its pool holds hdr too
+
+	memcpy( out, hdr, lo );
+	pos = lo;
+	outseq = (mstudioseqdesc_t *)((byte *)hdr + hdr->seqindex); // old copy, read only
+	for( i = 0; i < hdr->numseq; i++ )
+	{
+		if( shared[i] )
+			continue;
+		memcpy((byte *)out + pos, (byte *)hdr + outseq[i].animindex, size[i] );
+		pos += size[i];
+	}
+	memcpy((byte *)out + pos, (byte *)hdr + hi, hdr->length - hi );
+
+	// offsets past the animations moved down by -delta
+	out->length = newlength;
+	SHIFT_OFS( out->seqindex );
+	SHIFT_OFS( out->seqgroupindex );
+	SHIFT_OFS( out->textureindex );
+	SHIFT_OFS( out->texturedataindex );
+	SHIFT_OFS( out->skinindex );
+	SHIFT_OFS( out->bodypartindex );
+	SHIFT_OFS( out->attachmentindex );
+	SHIFT_OFS( out->soundindex );
+	SHIFT_OFS( out->soundgroupindex );
+	SHIFT_OFS( out->transitionindex );
+	SHIFT_OFS( out->boneindex );
+	SHIFT_OFS( out->bonecontrollerindex );
+	SHIFT_OFS( out->hitboxindex );
+
+	outseq = (mstudioseqdesc_t *)((byte *)out + out->seqindex);
+	pos = lo;
+	for( i = 0; i < out->numseq; i++ )
+	{
+		SHIFT_OFS( outseq[i].eventindex );
+		SHIFT_OFS( outseq[i].pivotindex );
+		SHIFT_OFS( outseq[i].automoveposindex );
+		SHIFT_OFS( outseq[i].automoveangleindex );
+
+		if( shared[i] )
+		{
+			outseq[i].animindex = (int)(((byte *)src + srcseq[i].animindex ) - (byte *)out );
+		}
+		else
+		{
+			outseq[i].animindex = pos;
+			pos += size[i];
+		}
+	}
+
+	for( i = 0; i < out->numbodyparts; i++ )
+	{
+		mstudiobodyparts_t	*part = (mstudiobodyparts_t *)((byte *)out + out->bodypartindex) + i;
+
+		SHIFT_OFS( part->modelindex );
+		for( j = 0; j < part->nummodels; j++ )
+		{
+			mstudiomodel_t	*model = (mstudiomodel_t *)((byte *)out + part->modelindex) + j;
+
+			SHIFT_OFS( model->meshindex );
+			SHIFT_OFS( model->vertinfoindex );
+			SHIFT_OFS( model->vertindex );
+			SHIFT_OFS( model->norminfoindex );
+			SHIFT_OFS( model->normindex );
+			SHIFT_OFS( model->blendvertinfoindex );
+			SHIFT_OFS( model->blendnorminfoindex );
+
+			for( k = 0; k < model->nummesh; k++ )
+			{
+				mstudiomesh_t	*mesh = (mstudiomesh_t *)((byte *)out + model->meshindex) + k;
+
+				SHIFT_OFS( mesh->triindex );
+				SHIFT_OFS( mesh->normindex );
+			}
+		}
+	}
+
+	anim_shares[slot].dep = mod;
+	anim_shares[slot].src = srcmod;
+
+	Con_Reportf( "S_PSP: %s uses %d of its %d animations from %s, %d KB saved\n",
+		mod->name, nshared, out->numseq, srcmod->name, -delta / 1024 );
+
+	Mem_Free( hdr );
+	return out;
+}
+
+#undef SHIFT_OFS
+
+/*
+=================
+Mod_StudioUnshare
+
+called by Mod_FreeModel: a model lending its animations frees the models
+using them first
+=================
+*/
+void Mod_StudioUnshare( model_t *mod )
+{
+	int	i;
+
+	for( i = 0; i < MAX_ANIM_SHARES; i++ )
+	{
+		if( anim_shares[i].dep == mod )
+			anim_shares[i].dep = anim_shares[i].src = NULL;
+	}
+
+	for( i = 0; i < MAX_ANIM_SHARES; i++ )
+	{
+		if( anim_shares[i].src == mod )
+		{
+			model_t	*dep = anim_shares[i].dep;
+
+			anim_shares[i].dep = anim_shares[i].src = NULL;
+			Mod_FreeModel( dep );
+		}
+	}
+}
+#endif // XASH_PSP
+
 /*
 =================
 Mod_LoadStudioModel
@@ -1118,6 +1401,9 @@ void Mod_LoadStudioModel( model_t *mod, const void *buffer, qboolean *loaded )
 
 			phdr = (studiohdr_t *)loadmodel->cache.data;
 			phdr->length = phdr->texturedataindex;	// update model size
+
+			phdr = Mod_StudioShareAnims( loadmodel, phdr );
+			loadmodel->cache.data = phdr;
 		}
 #endif
 		else

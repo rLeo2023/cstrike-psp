@@ -4,7 +4,7 @@
 
 A port of Counter-Strike 1.6 to the PSP, built on the [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs)
 engine and based on [Crow-bar's](https://github.com/Crow-bar/xash3d-fwgs) PSP port.
-You play against bots, up to 5 vs 5, alone or with a friend over ad-hoc. It runs on real PSP hardware and on PPSSPP.
+You play against up to 15 bots, alone or with a friend over ad-hoc. It runs on real PSP hardware and on PPSSPP.
 
 This repository contains **code and configuration only**. It does not include any game files
 (maps, models, sounds, textures): you need a legal copy of Counter-Strike 1.6.
@@ -64,11 +64,12 @@ The output is `build/engine/EBOOT.PBP` and `build/engine/xash.prx`.
 | L (short press) | Secondary attack (zoom, silencer, burst, knife stab) |
 | L + ✕ | Jump |
 | L + ○ | Crouch while held |
-| L + □ / L + △ | Previous weapon / drop weapon |
+| L + □ / L + △ | Last weapon used / drop weapon |
 | L + ↑ / L + R | Grenades / knife |
+| L + SELECT | Change team |
 | D-pad ↓ | Crouch (press once to stay down, again to stand up) |
 | D-pad ← / → | Next weapon / use and reload |
-| D-pad ↑ | Change team |
+| D-pad ↑ | Scoreboard (while held) |
 | SELECT | Buy menu (includes "9. Autobuy", from `autobuy.txt`) |
 | START | Menu |
 
@@ -77,6 +78,14 @@ The buttons are set in `cstrike/userconfig.cfg`. Look speed, invert look, analog
 deadzone, aim assist and crosshair are in Options → Controls, and the player name in
 Options → Player name (on-screen keyboard: D-pad and ✕). Settings are saved when you leave a
 settings page and with Options → Save settings.
+
+## Frame rate
+
+Options → Video has two modes, both locked to the screen refresh so the picture never tears:
+
+- **30 FPS** (default): a steady 30, easier on the battery.
+- **60 FPS**: unlocks up to 60. Meant for PPSSPP, a PSP on the charger or games with few bots;
+  with many bots it drops to 30 in busy moments.
 
 ## Ad-hoc multiplayer
 
@@ -97,15 +106,24 @@ address, and enable the built-in PRO ad-hoc server on one of them only.
   and loaded on first use; bot navigation mesh streamed from disk and only loaded when there are
   bots; model loading without intermediate copies; smaller entity history, temp entity, particle and
   beam pools; no radar; corpses removed after the death animation; bot navigation meshes loaded
-  without the "encounter spots" (~1.5-2 MB per map). Dust2 5v5 keeps ~7 MB free.
+  without the "encounter spots" (~1.5-2 MB per map); the second player model borrows the
+  animations it has byte for byte in common with the first (~1.9 MB); network buffers only for
+  real players, not for bots (~128 KB per bot); map polygons and collision bevels in one block
+  each instead of ~5000 small ones; player and weapon models kept between maps. Dust2 with 15
+  bots peaks at ~27 MB of the 40 MB heap.
 - **Low memory**: when the heap runs low in a game, sounds that aren't playing are freed (they
   load again when needed); if that isn't enough the game goes back to the menu with a message
   instead of freezing the console.
 - **Rendering**: software clipping of first-person weapon triangles; fixed back-face culling with
-  `cl_righthand 1`; crosshair visible with `hud_scale` < 1; 45 fps cap that sleeps instead of
-  busy-waiting (saves battery); map sprites farther than 1500 units aren't drawn (the 16-bit
-  depth buffer let them show through walls); no spectator inset window.
-- **Bots**: with 8 or more bots their full think runs 8 times a second instead of 10.
+  `cl_righthand 1`; crosshair visible with `hud_scale` < 1; 30 / 60 fps modes locked to the
+  screen refresh; map sprites farther than 1500 units aren't drawn (the 16-bit depth buffer let
+  them show through walls); no spectator inset window; compact scoreboard that fits the screen.
+- **Speed**: player animation math on the VFPU instead of software double precision (the PSP
+  FPU has no doubles), players outside the view skipped before animating them, display list
+  guarded against overflowing with many players on screen.
+- **Bots**: their full think runs 10 times a second, 8 with 8 or more bots and 6 with 12 or more,
+  spread over the frames so they don't all think at once; reaction times follow the actual think
+  rate.
 - **Gameplay**: text menus with a gamepad cursor (team selection, buying), autobuy in the buy menu,
   game menu with map, number of bots and bot difficulty (Easy / Medium), client-side aim assist,
   PSP controls page, settings saved on the spot, localized hint texts, fixed magazine reloads
@@ -122,7 +140,9 @@ address, and enable the built-in PRO ad-hoc server on one of them only.
   many bots on a heavy map the game may go back to the menu with a "Not enough memory" message:
   use fewer bots.
 - Ad-hoc has been tested on PPSSPP; tests on real PSPs are welcome.
-- With many bots (4v4, 5v5) the frame rate drops in busy moments.
+- With many bots the frame rate drops in busy moments, more so in 60 FPS mode.
+- The first time a weapon sound plays it is read from the memory stick, which can cause a short
+  hitch.
 
 ## Credits and licenses
 

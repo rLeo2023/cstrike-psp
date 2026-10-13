@@ -154,7 +154,13 @@ typedef struct netsplit_packet_s
 
 typedef struct netsplit_s
 {
+#if XASH_PSP
+	// [NETSPLIT_BACKUP], allocated on the first split packet: only the
+	// client's channel ever gets any (see netchan_t below)
+	netsplit_chain_packet_t *packets;
+#else
 	netsplit_chain_packet_t packets[NETSPLIT_BACKUP];
+#endif
 	uint64_t total_received;
 	uint64_t total_received_uncompressed;
 } netsplit_t;
@@ -254,12 +260,24 @@ typedef struct netchan_s
 
 	// staging and holding areas
 	sizebuf_t		message;
+#if XASH_PSP
+	// NET_MAX_MESSAGE each, allocated by Netchan_Setup and kept with the
+	// server slot (Netchan_FreeBuffers). Bots never set up a channel, they
+	// were 64 KB of unused buffers per bot (plus 64 KB of netsplit) when
+	// these were arrays
+	byte		*message_buf;
+#else
 	byte		message_buf[NET_MAX_MESSAGE];
+#endif
 
 	// reliable message buffer.
 	// we keep adding to it until reliable is acknowledged.  Then we clear it.
 	int		reliable_length;
+#if XASH_PSP
+	byte		*reliable_buf;
+#else
 	byte		reliable_buf[NET_MAX_MESSAGE];	// unacked reliable message (max size for loopback connection)
+#endif
 
 	// Waiting list of buffered fragments to go onto queue.
 	// Multiple outgoing buffers can be queued in succession
@@ -306,6 +324,9 @@ extern int		net_drop;
 
 void Netchan_Init( void );
 void Netchan_Shutdown( void );
+#if XASH_PSP
+void Netchan_FreeBuffers( netchan_t *chan );
+#endif
 void Netchan_Setup( netsrc_t sock, netchan_t *chan, netadr_t adr, int qport, void *client, int (*pfnBlockSize)(void *, fragsize_t mode ) );
 void Netchan_CreateFileFragmentsFromBuffer( netchan_t *chan, const char *filename, byte *pbuf, int size );
 qboolean Netchan_CopyNormalFragments( netchan_t *chan, sizebuf_t *msg, size_t *length );

@@ -1121,6 +1121,14 @@ static void Mod_CalcSurfaceBounds( msurface_t *surf )
 	VectorAverage( surf->info->mins, surf->info->maxs, surf->info->origin );
 }
 
+#if XASH_PSP
+// one block for all the bevels of a map instead of one per surface: dust2
+// has 5383 surfaces and the allocator's own header on each ~120 byte bevel
+// added about a third to them (Mod_LoadSurfaces sets it up)
+static byte	*bevel_arena;
+static size_t	bevel_arena_left;
+#endif
+
 /*
 =================
 Mod_CreateFaceBevels
@@ -1142,6 +1150,15 @@ static void Mod_CreateFaceBevels( msurface_t *surf )
 	else contents = CONTENTS_SOLID;
 
 	size = sizeof( mfacebevel_t ) + surf->numedges * sizeof( mplane_t );
+#if XASH_PSP
+	if( bevel_arena && size <= bevel_arena_left )
+	{
+		facebevel = bevel_arena; // already zeroed
+		bevel_arena += size;
+		bevel_arena_left -= size;
+	}
+	else
+#endif
 	facebevel = (byte *)Mem_Calloc( loadmodel->mempool, size );
 	fb = (mfacebevel_t *)facebevel;
 	facebevel += sizeof( mfacebevel_t );
@@ -2270,6 +2287,21 @@ static void Mod_LoadSurfaces( dbspmodel_t *bmod )
 		bmod->lightmap_samples = 1;
 	else bmod->lightmap_samples = 3;
 
+#if XASH_PSP
+	{
+		size_t	total = 0;
+
+		for( i = 0; i < bmod->numsurfaces; i++ )
+		{
+			int	numedges = ( bmod->version == QBSP2_VERSION ) ? bmod->surfaces32[i].numedges : bmod->surfaces[i].numedges;
+			total += sizeof( mfacebevel_t ) + numedges * sizeof( mplane_t );
+		}
+
+		bevel_arena = total ? Mem_Calloc( loadmodel->mempool, total ) : NULL;
+		bevel_arena_left = total;
+	}
+#endif
+
 	for( i = 0; i < bmod->numsurfaces; i++, out++, info++ )
 	{
 		texture_t	*tex;
@@ -2379,6 +2411,11 @@ static void Mod_LoadSurfaces( dbspmodel_t *bmod )
 			ref.dllFuncs.GL_SubdivideSurface( out ); // cut up polygon for warps
 #endif
 	}
+
+#if XASH_PSP
+	bevel_arena = NULL;
+	bevel_arena_left = 0;
+#endif
 
 	// now we have enough data to trying determine samplecount per lightmap pixel
 	if( test_lightsize > 0 && prev_lightofs != -1 && next_lightofs != -1 && next_lightofs != 99999999 )

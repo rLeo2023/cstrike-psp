@@ -370,8 +370,12 @@ void PSP_LogHeapUsage( const char *when )
 	// never touched part of the heap plus free blocks inside the used part
 	int left = ( heap - (int)mi.arena ) + (int)mi.fordblks;
 
-	Sys_PrintLog( va( "S_PSP: %s: heap used %d KB, free %d KB (largest chunk at least %d KB)\n",
-		when, (int)( mi.uordblks / 1024 ), left / 1024, ( heap - (int)mi.arena ) / 1024 ));
+	// usmblks: the furthest the heap ever reached since the game started,
+	// gaps between blocks included. A heap smaller than that would have
+	// run out somewhere, so it is the number PSP_HEAP_SIZE_KB must stay over
+	Sys_PrintLog( va( "S_PSP: %s: heap used %d KB, free %d KB (largest chunk at least %d KB), highest point %d KB of %d\n",
+		when, (int)( mi.uordblks / 1024 ), left / 1024, ( heap - (int)mi.arena ) / 1024,
+		(int)(( mi.usmblks > mi.arena ? mi.usmblks : mi.arena ) / 1024 ), sce_newlib_heap_kb_size ));
 }
 
 void Platform_Init( void )

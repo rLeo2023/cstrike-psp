@@ -77,7 +77,13 @@ void CCSBot::StuckCheck()
 
 		// cannot be Length2D, or will break ladder movement (they are only Z)
 		float moveDist = vel.Length();
+#ifdef __PSP__
+		// one sample per full think, which can be 1/8 or 1/6 s apart (bot.cpp)
+		extern float BotFullThinkInterval();
+		float deltaT = BotFullThinkInterval();
+#else
 		float deltaT = g_flBotFullThinkInterval;
+#endif
 
 		m_avgVel[m_avgVelIndex++] = moveDist / deltaT;
 
