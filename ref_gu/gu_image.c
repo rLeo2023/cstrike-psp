@@ -2184,8 +2184,9 @@ counters:
 
 	if( r_perf.swaps )
 	{
-		gEngfuncs.Con_Printf( "S_PSP: render: waiting for the GPU %.1f ms per frame, biggest display list %d KB\n",
-			r_perf.gpuwait * 1000.0 / r_perf.swaps, r_perf.listmax / 1024 );
+		gEngfuncs.Con_Printf( "S_PSP: render: waiting for the GPU %.1f ms per frame, biggest display list %d KB of %d%s\n",
+			r_perf.gpuwait * 1000.0 / r_perf.swaps, r_perf.listmax / 1024, (int)( guRender.context_list_size / 1024 ),
+			r_perf.listmax > (int)( guRender.context_list_size * 3 / 4 ) ? " - WARNING: close to full" : "" );
 	}
 
 	memset( &r_perf, 0, sizeof( r_perf ));

@@ -692,6 +692,35 @@ static void Adhoc_JoinFrame( void )
 	}
 }
 
+/*
+==============
+PSP_NetCancelJoin
+
+"disconnect" while Join Ad-hoc is joining the group or searching: stop it
+and close the connection screen. False when no search was running.
+==============
+*/
+qboolean PSP_NetCancelJoin( void )
+{
+	if( join_state == JOIN_IDLE )
+		return false;
+
+	if( join_pdp >= 0 )
+	{
+		sceNetAdhocPdpDelete( join_pdp, 0 );
+		join_pdp = -1;
+	}
+
+	// not in the group yet: leave it, the next Join Ad-hoc starts over
+	if( join_state == JOIN_GROUP )
+		sceNetAdhocctlDisconnect();
+
+	join_state = JOIN_IDLE;
+	Con_Printf( "S_PSP: adhoc: search cancelled\n" );
+	Cbuf_AddText( "menu_connectionprogress disconnect\n" );
+	return true;
+}
+
 // once per host frame
 void PSP_NetFrame( void )
 {

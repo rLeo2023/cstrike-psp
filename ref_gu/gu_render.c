@@ -84,7 +84,9 @@ gurender_t	guRender;
 #define PSP_FB_BPP			4
 #endif
 
-#define PSP_GU_LIST_SIZE	0x100000 // 1Mb
+// a frame's display list measured at most ~400 KB (dust, cs_siege, 9 bots);
+// 1 MB of static RAM was mostly unused. "r_psp_report" logs the biggest one
+#define PSP_GU_LIST_SIZE	0xA0000 // 640 KB
 
 static byte context_list[PSP_GU_LIST_SIZE] __attribute__( ( aligned( 64 ) ) );
 

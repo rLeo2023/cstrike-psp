@@ -357,6 +357,9 @@ class PSP:
 		cflags += ['-I%s' % (os.path.join(self.pspsdk_path, 'include'))]
 		cflags += ['-I.']
 		cflags += ['-DNDEBUG', '-D_PSP_FW_VERSION=%s' % self.fw_version, '-G0']
+		# one section per function/variable: --gc-sections (ldflags) then drops
+		# what nothing calls. The whole program is loaded into RAM at start
+		cflags += ['-ffunction-sections', '-fdata-sections']
 		return cflags
 	# they go before object list
 	def linkflags(self):
@@ -367,7 +370,11 @@ class PSP:
 		ldflags = []
 		if self.build_prx:
 			ldflags += ['-specs=%s' % os.path.join(self.pspsdk_path, 'lib/prxspecs')]
-			ldflags += ['-Wl,-q,-T%s' % os.path.join(self.pspsdk_path, 'lib/linkfile.prx')]
+			# the SDK's linkfile.prx plus KEEP() on the import/export tables,
+			# which --gc-sections would otherwise throw away
+			linkfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'psp', 'linkfile_gc.prx')
+			ldflags += ['-Wl,-q,-T%s' % os.path.normpath(linkfile)]
+			ldflags += ['-Wl,--gc-sections']
 		ldflags += ['-L%s' % os.path.join(self.pspsdk_path, 'lib')]
 		ldflags += ['-L.']
 		return ldflags

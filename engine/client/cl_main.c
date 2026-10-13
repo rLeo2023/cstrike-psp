@@ -1686,6 +1686,14 @@ void CL_Disconnect( void )
 
 void CL_Disconnect_f( void )
 {
+#if XASH_PSP
+	// the connection screen's Disconnect while Join Ad-hoc is still looking
+	// for a game: there is no connection yet, stop the search instead
+	qboolean PSP_NetCancelJoin( void );
+
+	if( PSP_NetCancelJoin( ))
+		return;
+#endif
 	if( Host_IsLocalClient( ))
 		Host_EndGame( true, "disconnected from server\n" );
 	else CL_Disconnect();
