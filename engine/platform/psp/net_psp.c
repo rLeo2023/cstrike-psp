@@ -492,6 +492,12 @@ static void Adhoc_Activate( int waited )
 	Adhoc_MacToIp( adhoc_mac, ip );
 	Con_Printf( "S_PSP: adhoc connected after %i ms, this PSP is %i.%i.%i.%i\n", waited, ip[0], ip[1], ip[2], ip[3] );
 
+	{
+		// the network modules are loaded outside the heap: how much they take
+		void PSP_LogHeapUsage( const char *when );
+		PSP_LogHeapUsage( "ad-hoc connected" );
+	}
+
 	// sockets of an earlier game failed while ad-hoc was off, the next
 	// NET_Config( true ) has to open them again
 	NET_Config( false );

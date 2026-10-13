@@ -23,22 +23,87 @@ GNU General Public License for more details.
 #include <pspprof.h>
 #include <pspctrl.h>
 #include <psputility.h>
+#include <pspge.h>
+#include <pspdisplay.h>
 
 #include <ctype.h>
+#include <stddef.h> // ptrdiff_t
 #include <malloc.h> // mallinfo
 
 
 PSP_MODULE_INFO( "Counter-Strike", PSP_MODULE_USER, 1, 0 );
 PSP_MAIN_THREAD_ATTR( PSP_THREAD_ATTR_USER | PSP_THREAD_ATTR_VFPU );
 PSP_MAIN_THREAD_STACK_SIZE_KB( 512 );
-/* Fixed size on purpose. A negative size ("all free memory minus a
-   threshold") makes the heap allocation fail on startup, every malloc then
-   fails with "Mem_AllocPool: out of memory" at host.c, both with
-   "-3 * 1024" and with -1 plus PSP_HEAP_THRESHOLD_SIZE_KB( 3 * 1024 ).
+/* The most the heap takes, on 64 MB models with extra memory. A negative
+   size ("all free memory minus a threshold") makes the heap allocation fail
+   on startup, every malloc then fails with "Mem_AllocPool: out of memory"
+   at host.c, both with "-3 * 1024" and with -1 plus
+   PSP_HEAP_THRESHOLD_SIZE_KB( 3 * 1024 ).
    PSP_LogMemory() reports what is left outside the heap, size it from that:
    with a 30 MB heap (MEMSIZE=1, PPSSPP) it showed 14235 KB still free, and
    30 MB ran out during CS precache. 40 MB keeps ~4 MB for modules/stacks. */
-PSP_HEAP_SIZE_KB( 40 * 1024 );
+#define PSP_HEAP_MAX_KB	( 40 * 1024 )
+PSP_HEAP_SIZE_KB( PSP_HEAP_MAX_KB );
+
+/* With less memory (PSP-1000: 24 MB for games) the heap is the largest free
+   block minus this, left for what is loaded after the heap is taken.
+   Measured: audio, renderer and threads take ~32 KB, the ad-hoc network
+   modules 176 KB more */
+#define PSP_HEAP_RESERVE_KB	512
+
+extern SceLwMutexWorkarea	__sbrk_mutex;	// libcglue
+extern SceUID		__psp_heap_blockid;	// libcglue, __psp_free_heap frees it on exit
+static char		*heap_bottom, *heap_top, *heap_end;
+static int		heap_maxfree_kb;	// largest free block when the heap was taken
+
+/*
+================
+_sbrk
+
+replaces libcglue's: same single block taken on the first call (libc init
+and C++ constructors already allocate before main), but sized to fit the
+memory there is. sce_newlib_heap_kb_size ends up with the real size, so the
+logs and the low memory checks keep using it
+================
+*/
+void *_sbrk( ptrdiff_t incr )
+{
+	void	*result = (void *)-1;
+
+	sceKernelLockLwMutex( &__sbrk_mutex, 1, NULL );
+
+	if( !heap_bottom )
+	{
+		int	maxfree = (int)sceKernelMaxFreeMemSize();
+		int	size = sce_newlib_heap_kb_size * 1024;
+
+		heap_maxfree_kb = maxfree / 1024;
+
+		if( size > maxfree - PSP_HEAP_RESERVE_KB * 1024 )
+			size = ( maxfree - PSP_HEAP_RESERVE_KB * 1024 ) & ~0xFFFF; // 64 KB multiple
+
+		if( size > 0 )
+		{
+			__psp_heap_blockid = sceKernelAllocPartitionMemory( 2, "heap_block", PSP_SMEM_Low, size, NULL );
+			if( __psp_heap_blockid > 0 )
+			{
+				heap_bottom = heap_top = (char *)sceKernelGetBlockHeadAddr( __psp_heap_blockid );
+				heap_end = heap_bottom + size;
+				sce_newlib_heap_kb_size = size / 1024;
+			}
+		}
+	}
+
+	if( heap_bottom && heap_top + incr >= heap_bottom && heap_top + incr <= heap_end )
+	{
+		result = heap_top;
+		heap_top += incr;
+	}
+
+	sceKernelUnlockLwMutex( &__sbrk_mutex, 1 );
+
+	return result;
+}
 
 static qboolean	psp_audiolib_init = false;
 
@@ -120,17 +185,22 @@ void Platform_ShellExecute( const char *path, const char *parms )
 }
 
 #if XASH_MESSAGEBOX == MSGBOX_PSP
+// VRAM offset of the error screen (512x272 8888, 544 KB): past the renderer's
+// draw, display and depth buffers (0 - 0x154000), inside the 2 MB of a
+// PSP-1000. pspDebugScreenInit() wrote into the frame the GE draws into:
+// a list still running painted over the text, and PPSSPP kept showing its
+// own copy of that frame, so errors looked like a black screen
+#define PSP_MSGBOX_VRAM_OFFSET	0x170000
+
 void Platform_MessageBox( const char *title, const char *message, qboolean parentMainWindow )
 {
-	static qboolean g_dbgscreen = false;
+	qboolean	nomemory = Q_stristr( message, "out of memory" ) != NULL;
 
-	// The debug screen below is often not visible (the renderer still owns
-	// the display, and PPSSPP keeps showing the last GE frame), which makes
-	// a fatal error look like a hang waiting for X. Keep a copy in xash.log.
+	// keep a copy in xash.log too
 	Sys_PrintLog( va( "MessageBox [%s]: %s\n", title, message ));
 
 	// renderer uploads fail with their own message, not through Mem_Alloc
-	if( Q_stristr( message, "out of memory" ))
+	if( nomemory )
 	{
 		void Mem_PrintReport( void );
 		Mem_PrintReport();
@@ -139,26 +209,53 @@ void Platform_MessageBox( const char *title, const char *message, qboolean paren
 	// Clear the sound buffer.
 	S_StopAllSounds( true );
 
-	// Print message to the debug screen.
-	if ( !g_dbgscreen )
+	// drop whatever the GE has queued (waiting with sceGeDrawSync hung: an
+	// error while loading leaves an open list that never finishes), then
+	// show the message from VRAM it never drew into
 	{
-		pspDebugScreenInit();
-		g_dbgscreen = true;
+		PspGeBreakParam	brk;
+		sceGeBreak( 1, &brk );
 	}
+	pspDebugScreenInitEx( (void *)( 0x40000000 | ( (u32)sceGeEdramGetAddr() + PSP_MSGBOX_VRAM_OFFSET )), PSP_DISPLAY_PIXEL_FORMAT_8888, 1 );
+	pspDebugScreenClear();
+
 	pspDebugScreenSetTextColor( 0x0080ff );
 	pspDebugScreenPrintf( "\n\n\n\n%s:\n", title );
 	pspDebugScreenSetTextColor( 0x0000ff );
 	pspDebugScreenPrintData( message, Q_strlen( message ) );
+
+	// the heap got less than it wanted: no extra memory (PSP-1000, or the
+	// CFW option is off)
+	if( nomemory && sce_newlib_heap_kb_size < PSP_HEAP_MAX_KB )
+	{
+		pspDebugScreenSetTextColor( 0x00ffff );
+		pspDebugScreenPrintf( "\n\nOnly %d MB of memory available (%d MB needed).\n"
+			"PSP-2000/3000/Go: enable \"Force Extra Memory\" in your CFW settings.\n"
+			"PSP-1000 is not supported yet.\n\n"
+			"Solo hay %d MB de memoria (se necesitan %d MB).\n"
+			"PSP-2000/3000/Go: activa \"Force Extra Memory\" en el CFW.\n"
+			"La PSP-1000 todavia no es compatible.\n",
+			sce_newlib_heap_kb_size / 1024, PSP_HEAP_MAX_KB / 1024,
+			sce_newlib_heap_kb_size / 1024, PSP_HEAP_MAX_KB / 1024 );
+	}
+
 	pspDebugScreenSetTextColor( 0xffffff );
 	pspDebugScreenPrintf( "\n\nPress X to continue.\n" );
+	Sys_PrintLog( "MessageBox: shown, waiting for X\n" );
 
-	// Wait for a X button press.
+	// Wait for a X button press (released first: it may be held from the menu).
 	SceCtrlData pad;
 	do
 	{
 		sceCtrlReadBufferPositive( &pad, 1 );
 	}
+	while( pad.Buttons & PSP_CTRL_CROSS );
+	do
+	{
+		sceCtrlReadBufferPositive( &pad, 1 );
+	}
 	while( !( pad.Buttons & PSP_CTRL_CROSS ) );
+	Sys_PrintLog( "MessageBox: X pressed\n" );
 	pspDebugScreenClear();
 }
 #endif // XASH_MESSAGEBOX == MSGBOX_PSP
@@ -342,8 +439,8 @@ memory left outside the newlib heap, called once the log file is open
 */
 void PSP_LogMemory( void )
 {
-	Sys_PrintLog( va( "S_PSP: heap %d KB, outside heap: max block %d KB, total free %d KB\n",
-		sce_newlib_heap_kb_size, (int)( sceKernelMaxFreeMemSize() / 1024 ),
+	Sys_PrintLog( va( "S_PSP: heap %d KB (of %d KB max, largest free block was %d KB), outside heap: max block %d KB, total free %d KB\n",
+		sce_newlib_heap_kb_size, PSP_HEAP_MAX_KB, heap_maxfree_kb, (int)( sceKernelMaxFreeMemSize() / 1024 ),
 		(int)( sceKernelTotalFreeMemSize() / 1024 )));
 }
 
@@ -365,10 +462,21 @@ int PSP_HeapFreeKB( void )
 
 void PSP_LogHeapUsage( const char *when )
 {
+	static int outside_lowest_kb = 0x7FFFFFFF;
 	struct mallinfo mi = mallinfo();
 	int heap = sce_newlib_heap_kb_size * 1024;
 	// never touched part of the heap plus free blocks inside the used part
 	int left = ( heap - (int)mi.arena ) + (int)mi.fordblks;
+	// what is loaded after the heap (threads, audio and ad-hoc modules)
+	// lives outside it: free at startup minus the lowest point tells how
+	// much PSP_HEAP_RESERVE_KB really needs
+	int outside_kb = (int)( sceKernelTotalFreeMemSize() / 1024 );
+
+	if( outside_kb < outside_lowest_kb )
+		outside_lowest_kb = outside_kb;
+
+	Sys_PrintLog( va( "S_PSP: %s: outside heap free %d KB (largest block %d KB, lowest seen %d KB of %d reserved)\n",
+		when, outside_kb, (int)( sceKernelMaxFreeMemSize() / 1024 ), outside_lowest_kb, PSP_HEAP_RESERVE_KB ));
 
 	// usmblks: the furthest the heap ever reached since the game started,
 	// gaps between blocks included. A heap smaller than that would have
