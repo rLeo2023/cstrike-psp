@@ -30,6 +30,7 @@ typedef struct fsh_path_s
 typedef struct fsh_handle_s
 {
 	qboolean	ready;
+	qboolean	incomplete;	// some files didn't fit: a miss can't say "not there"
 	int		count;
 	char		folderpath[PATH_MAX];
 	int		folderpath_size;
@@ -93,6 +94,14 @@ int FSH_AddFilePathWs( fsh_handle_t *handle, const char *path, int size )
 
 	strip_path = path + handle->folderpath_size + 1; // + '/'
 
+	// stored cut short it would answer for the wrong file: leave it out,
+	// lookups that miss then go to the memory stick (FSH_Find)
+	if( Q_strlen( strip_path ) >= FSH_MAX_PATH )
+	{
+		handle->incomplete = true;
+		return -3;
+	}
+
 	hash = COM_HashKey( strip_path, handle->hashlist_size );
 
 	if( handle->ready && handle->count > 0 )
@@ -125,9 +134,13 @@ int FSH_AddFilePathWs( fsh_handle_t *handle, const char *path, int size )
 		}
 	}
 
-	// create new
+	// create new. A full table used to make FSH_Create drop all of it (a
+	// complete Half-Life "valve" folder alone has 4300 files)
 	if( handle->count + 1 >= handle->pathlist_size )
-		return -1;
+	{
+		handle->incomplete = true;
+		return -3;
+	}
 
 	fptr = &handle->pathlist[handle->count];
 	Q_strncpy( fptr->path, strip_path, FSH_MAX_PATH - 1 );
@@ -256,7 +269,7 @@ int FSH_FindSize( fsh_handle_t *handle, const char *path )
 			return fptr->fsize;
 	}
 
-	return -1;
+	return handle->incomplete ? -2 : -1;
 }
 
 /*
@@ -286,7 +299,7 @@ int FSH_Find( fsh_handle_t *handle, const char *path )
 			return fptr - handle->pathlist; // index
 	}
 
-	return -1;
+	return handle->incomplete ? -2 : -1;
 }
 
 /*
@@ -298,45 +311,57 @@ static int FSH_ScanDir( fsh_handle_t *handle, const char *path )
 {
 	SceUID		dir;
 	SceIoDirent	entry;
-	char		temp[FSH_MAX_PATH];
-	int		result;
+	// the full path, game folder included: it was FSH_MAX_PATH (64) with an
+	// unchecked sprintf, and "ms0:/PSP/GAME/<folder>/cstrike/sound/radio/..."
+	// overran it and the stack (a PSP-2000 powered off at startup)
+	char		temp[PATH_MAX];
+	size_t		pathlen = Q_strlen( path );
 	int		fsize;
 
 	if(( dir = sceIoDopen( path )) < 0 )
 		return -1;
-
-	result = 0;
 
 	// iterate through the directory
 	while( 1 )
 	{
 		// zero the dirent, to avoid possible problems with sceIoDread
 		memset( &entry, 0, sizeof( SceIoDirent ));
-		if( !sceIoDread( dir, &entry ))
+		if( sceIoDread( dir, &entry ) <= 0 )
 			break;
 
 		// ignore the virtual directories
 		if( !Q_stricmp( entry.d_name, "." ) || !Q_stricmp( entry.d_name, ".." ))
 			continue;
 
-		sprintf( temp, "%s/%s", path, entry.d_name );
+		if( pathlen + 1 + Q_strlen( entry.d_name ) >= sizeof( temp ))
+		{
+			handle->incomplete = true;
+			continue;
+		}
 
-		if(FIO_S_ISDIR( entry.d_stat.st_mode ))
-			result = FSH_ScanDir( handle, temp );
-		else if(FIO_S_ISREG( entry.d_stat.st_mode ))
+		Q_strncpy( temp, path, sizeof( temp ));
+		temp[pathlen] = '/';
+		Q_strncpy( temp + pathlen + 1, entry.d_name, sizeof( temp ) - pathlen - 1 );
+
+		if( FIO_S_ISDIR( entry.d_stat.st_mode ))
+		{
+			// a folder that can't be read leaves files out, it doesn't end the scan
+			if( FSH_ScanDir( handle, temp ) < 0 )
+				handle->incomplete = true;
+		}
+		else if( FIO_S_ISREG( entry.d_stat.st_mode ))
 		{
 			if( entry.d_stat.st_size <= __INT_MAX__ )
 				fsize = ( int )entry.d_stat.st_size;
 			else fsize = -3; // undefined
 
-			result = FSH_AddFilePathWs( handle, temp, fsize );
+			// a file that doesn't fit marks the table incomplete
+			FSH_AddFilePathWs( handle, temp, fsize );
 		}
-		else continue;
-		if( result < 0 ) break;
 	}
 	sceIoDclose( dir );
 
-	return result;
+	return 0;
 }
 
 /*
@@ -356,7 +381,7 @@ fsh_handle_t *FSH_Create( const char *path, int maxfiles )
 	handle->pathlist = P5Ram_Alloc( handle->pathlist_size * sizeof( fsh_path_t ), 1 );
 	if( !handle->pathlist )
 	{
-		P5Ram_Free( handle );
+		FSH_Free( handle );
 		return NULL;
 	}
 
@@ -364,7 +389,7 @@ fsh_handle_t *FSH_Create( const char *path, int maxfiles )
 	handle->hashlist = P5Ram_Alloc( handle->hashlist_size * sizeof( fsh_path_t* ), 1 );
 	if( !handle->hashlist )
 	{
-		P5Ram_Free( handle );
+		FSH_Free( handle ); // the path list too, it stayed taken before
 		return NULL;
 	}
 
@@ -378,7 +403,7 @@ fsh_handle_t *FSH_Create( const char *path, int maxfiles )
 
 	if( FSH_ScanDir( handle, handle->folderpath ) < 0 )
 	{
-		P5Ram_Free( handle );
+		FSH_Free( handle );
 		return NULL;
 	}
 
@@ -386,6 +411,9 @@ fsh_handle_t *FSH_Create( const char *path, int maxfiles )
 	fsh_poolchain = handle;
 
 	handle->ready = true;
+
+	Con_Printf( "S_PSP: file table %s: %d files%s\n", handle->folderpath, handle->count,
+		handle->incomplete ? " (some left out, looked up on the memory stick)" : "" );
 
 	return handle;
 }
