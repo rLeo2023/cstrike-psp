@@ -163,6 +163,11 @@ address, and enable the built-in PRO ad-hoc server on one of them only.
 - The first time a weapon sound plays it is read from the memory stick, which can cause a short
   hitch.
 
+## Use of AI
+
+This port was made with the help of AI: Claude (Anthropic) helped write the code and adapt the
+Counter-Strike client to the PSP.
+
 ## Credits and licenses
 
 - Xash3D engine: Unkle Mike and the [FWGS](https://github.com/FWGS/xash3d-fwgs) team. PSP port: [Crow-bar](https://github.com/Crow-bar/xash3d-fwgs). See `README-xash3d.md`.

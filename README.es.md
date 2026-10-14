@@ -166,6 +166,11 @@ el servidor PRO ad-hoc integrado activado solo en una de las dos.
 - El modo reposo durante una partida todavía no se probó en una consola real.
 - La primera vez que suena un arma su sonido se lee de la memory stick, y puede haber un tirón corto.
 
+## Uso de IA
+
+Este port se hizo con ayuda de IA: Claude (Anthropic) ayudó a escribir el código y a adaptar el
+cliente de Counter-Strike a la PSP.
+
 ## Créditos y licencias
 
 - Xash3D engine: Unkle Mike y el equipo [FWGS](https://github.com/FWGS/xash3d-fwgs). Port a PSP: [Crow-bar](https://github.com/Crow-bar/xash3d-fwgs). Ver `README-xash3d.md`.
