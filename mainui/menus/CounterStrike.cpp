@@ -27,8 +27,9 @@ the Free Software Foundation, either version 3 of the License, or
 
 #define ART_BANNER		"gfx/shell/head_creategame"
 
-// upper bound for the bot count slider
-#define MAX_BOTS		15
+// upper bound for the bot count slider: 13 bots + you = 7 vs 7. On a real
+// PSP (PS Vita) 15 bots ran at ~23 fps with almost half the frames late
+#define MAX_BOTS		13
 // with "Ad-hoc" checked
 #define MAX_BOTS_ADHOC		6
 

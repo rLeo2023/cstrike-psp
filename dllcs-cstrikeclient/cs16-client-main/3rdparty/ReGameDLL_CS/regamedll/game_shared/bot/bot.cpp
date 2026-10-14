@@ -65,7 +65,9 @@ Vector CBot::GetAutoaimVector(float flDelta)
 #ifdef __PSP__
 // With many bots their full think (vision, paths, decisions) is most of the
 // server's CPU time: from 8 bots up it runs 8 times a second instead of 10,
-// from 12 up 6 times. Aiming (Upkeep) and movement commands keep their 30 Hz.
+// from 10 up 6 times (on a PS Vita 15 bots took 5.6-8.6 ms a frame). Aiming
+// (Upkeep) and movement commands keep their 30 Hz, and the reaction times
+// follow the real interval (cs_bot_vision.cpp), so they look the same.
 static int BotCountThisFrame()
 {
 	static float lastTime = -1.0f;
@@ -85,7 +87,7 @@ static int BotFullThinkRate()
 {
 	int bots = BotCountThisFrame();
 
-	if (bots >= 12)
+	if (bots >= 10)
 		return 6;
 	if (bots >= 8)
 		return 8;
@@ -101,7 +103,7 @@ float BotFullThinkInterval()
 // frame it ran in), and 9 of them in one frame are a ~10 ms hitch. Only a
 // share of them per server frame, the rest wait for their next command
 // tick: what the bots need on average at 30 fps plus one, so nobody falls
-// behind (9 bots: 4 per frame, 15 bots: 4)
+// behind (9 bots: 4 per frame, 13 bots: 4)
 static bool BotFullThinkAllowed()
 {
 	static float frameTime = -1.0f;

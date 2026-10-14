@@ -4,7 +4,7 @@
 
 A port of Counter-Strike 1.6 to the PSP, built on the [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs)
 engine and based on [Crow-bar's](https://github.com/Crow-bar/xash3d-fwgs) PSP port.
-You play against up to 15 bots, alone or with a friend over ad-hoc. It runs on real PSP hardware, on a PS Vita with Adrenaline and on PPSSPP.
+You play against up to 13 bots (7 vs 7), alone or with a friend over ad-hoc. It runs on real PSP hardware, on a PS Vita with Adrenaline and on PPSSPP.
 
 This repository contains **code and configuration only**. It does not include any game files
 (maps, models, sounds, textures): you need a legal copy of Counter-Strike 1.6.
@@ -88,6 +88,18 @@ Options → Video has two modes, both locked to the screen refresh so the pictur
 - **60 FPS**: unlocks up to 60. Meant for PPSSPP, a PSP on the charger or games with few bots;
   with many bots it drops to 30 in busy moments.
 
+A real PSP (or PS Vita) is slower than PPSSPP, which runs the game as fast as the PC allows: the
+same frame takes about 2 to 2.5 times longer on the console. Measured on a PS Vita with
+Adrenaline, de_dust2:
+
+| | Real hardware |
+|---|---|
+| No bots, 30 FPS mode | steady 30 |
+| Many bots, 30 FPS mode | ~23-26, lower in big fights |
+| 60 FPS mode | ~30-40 at best: it can't reach 60 |
+
+On real hardware 30 FPS mode is the one to use, and fewer bots keep it steadier.
+
 ## Ad-hoc multiplayer
 
 Two PSPs play the same game (the host's bots included):
@@ -101,7 +113,8 @@ address, and enable the built-in PRO ad-hoc server on one of them only.
 
 ## Main changes from the original projects
 
-- **Memory**: fixed 40 MB heap; one model per team (terror / gign), with `player.mdl` replaced by the
+- **Memory**: heap of up to 40 MB, sized to the memory the console has (a fixed 40 MB didn't fit on
+  real PSPs); one model per team (terror / gign), with `player.mdl` replaced by the
   CT model; textures shared between models and no mipmaps on weapons and sprites; weapon, world, sky
   and effect textures at half resolution (HUD and menus at full); sounds converted to 8 bit / 22 kHz
   and loaded on first use; bot navigation mesh streamed from disk and only loaded when there are
@@ -110,8 +123,10 @@ address, and enable the built-in PRO ad-hoc server on one of them only.
   without the "encounter spots" (~1.5-2 MB per map); the second player model borrows the
   animations it has byte for byte in common with the first (~1.9 MB); network buffers only for
   real players, not for bots (~128 KB per bot); map polygons and collision bevels in one block
-  each instead of ~5000 small ones; player and weapon models kept between maps. Dust2 with 15
-  bots peaks at ~27 MB of the 40 MB heap.
+  each instead of ~5000 small ones; player and weapon models kept between maps; ~1.8 MB less
+  static memory (display list allocated at start, smaller sound channels, loopback buffers and
+  tables); model and map files read into the PSP's volatile memory while loading. Dust2 with
+  many bots peaks at ~27 MB of the 40 MB heap.
 - **Low memory**: when the heap runs low in a game, sounds that aren't playing are freed (they
   load again when needed); if that isn't enough the game goes back to the menu with a message
   instead of freezing the console.
@@ -122,7 +137,8 @@ address, and enable the built-in PRO ad-hoc server on one of them only.
 - **Speed**: player animation math on the VFPU instead of software double precision (the PSP
   FPU has no doubles), players outside the view skipped before animating them, display list
   guarded against overflowing with many players on screen.
-- **Bots**: their full think runs 10 times a second, 8 with 8 or more bots and 6 with 12 or more,
+- **Bots**: up to 13 (7 vs 7; 15 ran at ~23 fps on real hardware); their full think runs 10 times
+  a second, 8 with 8 or more bots and 6 with 10 or more,
   spread over the frames so they don't all think at once; reaction times follow the actual think
   rate.
 - **Gameplay**: text menus with a gamepad cursor (team selection, buying), autobuy in the buy menu,
@@ -141,7 +157,9 @@ address, and enable the built-in PRO ad-hoc server on one of them only.
   many bots on a heavy map the game may go back to the menu with a "Not enough memory" message:
   use fewer bots.
 - Ad-hoc has been tested on PPSSPP; tests on real PSPs are welcome.
-- With many bots the frame rate drops in busy moments, more so in 60 FPS mode.
+- With many bots the frame rate drops in busy moments, more so on real hardware (~23-26 fps with
+  many bots) and in 60 FPS mode, which can't reach 60 on a real console.
+- Sleep mode during a game hasn't been tested on a real console yet.
 - The first time a weapon sound plays it is read from the memory stick, which can cause a short
   hitch.
 

@@ -4,7 +4,7 @@
 
 Port de Counter-Strike 1.6 a la PSP sobre el motor [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs),
 partiendo del port de PSP de [Crow-bar](https://github.com/Crow-bar/xash3d-fwgs).
-Se juega contra hasta 15 bots, solo o con un amigo por ad-hoc, y anda en PSP, en PS Vita con Adrenaline y en PPSSPP.
+Se juega contra hasta 13 bots (7 contra 7), solo o con un amigo por ad-hoc, y anda en PSP, en PS Vita con Adrenaline y en PPSSPP.
 
 Este repositorio contiene **solo código y configuración**. No incluye ningún archivo del juego
 (mapas, modelos, sonidos, texturas): hace falta una copia legal de Counter-Strike 1.6.
@@ -88,6 +88,18 @@ imagen nunca se corte (sin tearing):
 - **60 FPS**: desbloquea hasta 60. Pensado para PPSSPP, la PSP enchufada o partidas con pocos bots;
   con muchos bots baja a 30 en los momentos con mucha acción.
 
+Una PSP real (o una PS Vita) es más lenta que PPSSPP, que corre el juego tan rápido como da la PC:
+el mismo frame tarda entre 2 y 2,5 veces más en la consola. Medido en una PS Vita con Adrenaline,
+de_dust2:
+
+| | Hardware real |
+|---|---|
+| Sin bots, modo 30 FPS | 30 fijos |
+| Muchos bots, modo 30 FPS | ~23-26, menos en peleas grandes |
+| Modo 60 FPS | ~30-40 como mucho: no llega a 60 |
+
+En hardware real conviene el modo 30 FPS, y con menos bots se mantiene más parejo.
+
 ## Multijugador ad-hoc
 
 Dos PSP juegan la misma partida (con los bots de quien la crea):
@@ -101,7 +113,8 @@ el servidor PRO ad-hoc integrado activado solo en una de las dos.
 
 ## Cambios principales respecto de los proyectos originales
 
-- **Memoria**: heap fijo de 40 MB; un solo modelo por equipo (terror / gign) y `player.mdl` reemplazado
+- **Memoria**: heap de hasta 40 MB, ajustado a la memoria que tenga la consola (40 MB fijos no
+  entraban en una PSP real); un solo modelo por equipo (terror / gign) y `player.mdl` reemplazado
   por el modelo CT; texturas compartidas entre modelos y sin mipmaps en armas y sprites; texturas de
   armas, mapa, cielo y efectos a media resolución (HUD y menús completos); sonidos pasados a 8 bits /
   22 kHz y cargados al primer uso; malla de navegación de los bots leída por partes y cargada solo si
@@ -111,7 +124,10 @@ el servidor PRO ad-hoc integrado activado solo en una de las dos.
   modelo de jugador usa las animaciones que tiene idénticas byte por byte al primero (~1,9 MB);
   buffers de red solo para jugadores reales, no para bots (~128 KB por bot); polígonos y bevels de
   colisión del mapa en un bloque cada uno en vez de ~5000 chicos; modelos de jugador y armas
-  conservados entre mapas. Dust2 con 15 bots llega a ~27 MB de los 40 MB del heap.
+  conservados entre mapas; ~1,8 MB menos de memoria estática (lista de dibujo reservada al
+  arrancar, canales de sonido, buffers de loopback y tablas más chicos); los archivos de modelos y
+  mapas se leen en la memoria volatile de la PSP mientras cargan. Dust2 con muchos bots llega a
+  ~27 MB de los 40 MB del heap.
 - **Memoria baja**: si en una partida queda poca memoria, se liberan los sonidos que no están sonando
   (se vuelven a cargar cuando hacen falta); si no alcanza, el juego vuelve al menú con un mensaje en
   vez de congelar la consola.
@@ -124,7 +140,8 @@ el servidor PRO ad-hoc integrado activado solo en una de las dos.
   emulada por software (la FPU de la PSP no tiene doubles), los jugadores fuera de cámara se
   descartan antes de animarlos, y la lista de dibujo está protegida contra desbordes con muchos
   jugadores en pantalla.
-- **Bots**: su lógica completa corre 10 veces por segundo, 8 con 8 bots o más y 6 con 12 o más,
+- **Bots**: hasta 13 (7 contra 7; con 15 iba a ~23 fps en hardware real); su lógica completa corre
+  10 veces por segundo, 8 con 8 bots o más y 6 con 10 o más,
   repartida entre los frames para que no piensen todos a la vez; el tiempo de reacción respeta la
   frecuencia real.
 - **Juego**: menús de texto con cursor para el gamepad (selección de equipo, compra), autobuy en el
@@ -144,7 +161,9 @@ el servidor PRO ad-hoc integrado activado solo en una de las dos.
   muchos bots en un mapa pesado el juego puede volver al menú con el mensaje "Not enough memory":
   usá menos bots.
 - El ad-hoc está probado en PPSSPP; se agradecen pruebas en PSP reales.
-- Con muchos bots bajan los fps en los momentos con mucha acción, más en el modo 60 FPS.
+- Con muchos bots bajan los fps en los momentos con mucha acción, más en hardware real (~23-26 fps
+  con muchos bots) y en el modo 60 FPS, que en una consola real no llega a 60.
+- El modo reposo durante una partida todavía no se probó en una consola real.
 - La primera vez que suena un arma su sonido se lee de la memory stick, y puede haber un tirón corto.
 
 ## Créditos y licencias
