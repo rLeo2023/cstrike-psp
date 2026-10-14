@@ -184,10 +184,11 @@ def configure(conf):
 		# set EBOOT.PBP generation parameters
 		conf.env.PSP_EBOOT_TITLE = 'Counter-Strike'
 		conf.env.PSP_EBOOT_SFO = 'PARAM.SFO'
-		conf.env.PSP_EBOOT_ICON = 'NULL'
+		# the XMB icon (144x80) and background (480x272)
+		conf.env.PSP_EBOOT_ICON = conf.path.find_node('scripts/psp/ICON0.PNG').abspath()
 		conf.env.PSP_EBOOT_ICON1 = 'NULL'
 		conf.env.PSP_EBOOT_UNKPNG = 'NULL'
-		conf.env.PSP_EBOOT_PIC1 = 'NULL'
+		conf.env.PSP_EBOOT_PIC1 = conf.path.find_node('scripts/psp/PIC1.PNG').abspath()
 		conf.env.PSP_EBOOT_SND0 = 'NULL'
 		conf.env.PSP_EBOOT_PSAR = 'NULL'
 
