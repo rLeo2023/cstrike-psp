@@ -116,6 +116,12 @@ static int Platform_ExitCallback( int count, int arg, void *common )
 static int Platform_PowerCallback( int count, int arg, void *common )
 {
 	P5Ram_PowerCallback( count, arg, common );
+
+	// the PSP comes back from sleep at its default 222 MHz: on a PS Vita the
+	// game then ran at ~6 fps with 15 bots (23-26 before the sleep)
+	if( arg & PSP_POWER_CB_RESUME_COMPLETE )
+		scePowerSetClockFrequency( 333, 333, 166 );
+
 	return 0;
 }
 

@@ -26,6 +26,7 @@ GNU General Public License for more details.
 #elif XASH_PSP
 #include <pspiofilemgr.h>
 #include <psprtc.h>
+#include <psppower.h> // CPU clock in the "back from sleep" line
 #include <dirent.h>
 #include <errno.h>
 #else
@@ -242,7 +243,8 @@ static void FS_PSPCheckHelpers( void )
 
 	start = Sys_DoubleTime();
 	FS_PSPCreateHelpers();
-	Con_Printf( "S_PSP: back from sleep, file tables rebuilt in %i ms\n", (int)(( Sys_DoubleTime() - start ) * 1000.0 ));
+	Con_Printf( "S_PSP: back from sleep, file tables rebuilt in %i ms, CPU at %i MHz\n",
+		(int)(( Sys_DoubleTime() - start ) * 1000.0 ), scePowerGetCpuClockFrequencyInt( ));
 }
 #endif
 

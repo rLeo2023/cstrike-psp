@@ -36,9 +36,28 @@ typedef struct {
 	char		log_path[MAX_SYSPATH];
 	FILE		*logfile;
 	int 		logfileno;
+#if XASH_PSP
+	qboolean		in_game;		// a game started: the log is closed less often
+	double		last_reopen;
+#endif
 } LogData;
 
 static LogData s_ld;
+
+#if XASH_PSP
+/*
+==================
+Sys_LogGameStarted
+
+see Sys_PrintLog: from the first game on, the log is closed and opened
+again at most every few seconds instead of after every line
+==================
+*/
+void Sys_LogGameStarted( void )
+{
+	s_ld.in_game = true;
+}
+#endif
 
 char *Sys_Input( void )
 {
@@ -255,9 +274,16 @@ void Sys_PrintLog( const char *pMsg )
 #if XASH_PSP
 	// a crash powers a real PSP off, and the memory stick keeps the size an
 	// open file had when it was opened: closed after every line, the log
-	// survives up to the last one
-	fclose( s_ld.logfile );
-	s_ld.logfile = fopen( s_ld.log_path, "a" );
+	// survives up to the last one. That costs a few ms each on a real memory
+	// stick (100 lines in a row stalled a game 1.5 s), so it is done for
+	// every line only until the first game starts, where a crash is most
+	// likely, and then at most every 5 s
+	if( !s_ld.in_game || Sys_DoubleTime() - s_ld.last_reopen >= 5.0 )
+	{
+		s_ld.last_reopen = Sys_DoubleTime();
+		fclose( s_ld.logfile );
+		s_ld.logfile = fopen( s_ld.log_path, "a" );
+	}
 #endif
 }
 

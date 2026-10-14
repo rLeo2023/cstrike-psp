@@ -292,7 +292,9 @@ static void CL_PSP_PerfReport( void )
 				100.0f * psp_perf.late / psp_perf.swaps, elapsed * ms - psp_perf.work * ms );
 	}
 
-	if( psp_perfCount == 3 )
+	// the pool and texture lists are 100+ lines: on a real memory stick
+	// writing them stalled the game 1.5 s, so only with -dev
+	if( psp_perfCount == 3 && host_developer.value )
 	{
 		Mem_PSPReport();
 		Cbuf_AddText( "r_psp_report textures\n" );
@@ -326,7 +328,9 @@ void CL_CheckClientState( void )
 #if XASH_PSP
 		{
 			void PSP_LogHeapUsage( const char *when );
+			void Sys_LogGameStarted( void );
 			PSP_LogHeapUsage( va( "in game on %s", clgame.mapname ));
+			Sys_LogGameStarted();
 			psp_reportTime = host.realtime + 90.0;
 
 			// measure from here, the loading frames would spoil the averages
