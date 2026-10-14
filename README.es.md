@@ -4,7 +4,7 @@
 
 Port de Counter-Strike 1.6 a la PSP sobre el motor [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs),
 partiendo del port de PSP de [Crow-bar](https://github.com/Crow-bar/xash3d-fwgs).
-Se juega contra hasta 15 bots, solo o con un amigo por ad-hoc, y anda en PSP y en PPSSPP.
+Se juega contra hasta 15 bots, solo o con un amigo por ad-hoc, y anda en PSP, en PS Vita con Adrenaline y en PPSSPP.
 
 Este repositorio contiene **solo código y configuración**. No incluye ningún archivo del juego
 (mapas, modelos, sonidos, texturas): hace falta una copia legal de Counter-Strike 1.6.
@@ -39,8 +39,9 @@ El resultado queda en `build/engine/EBOOT.PBP` y `build/engine/xash.prx`.
 
 - Una PSP con 64 MB de RAM (PSP-2000, 3000, Go o E1000). La PSP-1000 tiene 32 MB y no alcanza.
 - Un custom firmware con **Force Extra Memory** activado (ARK-4 / PRO / ME: en el menú recovery o
-  VSH, "Force Extra Memory" / "Use high memory layout"). **Sin eso el juego no arranca.**
-  En PPSSPP no hace falta nada.
+  VSH, "Force Extra Memory" / "Use high memory layout"). **Sin eso el juego no puede cargar un mapa**
+  y muestra un mensaje que lo pide. En PPSSPP no hace falta nada.
+- O una PS Vita con Adrenaline (carpeta del juego `ux0:pspemu/PSP/GAME/CSTRIKE/`).
 - Una copia legal de Counter-Strike 1.6.
 
 ## Instalar

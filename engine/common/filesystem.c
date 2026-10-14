@@ -191,6 +191,59 @@ static qboolean		fs_caseinsensitive = true; // try to search missing files
 #if XASH_PSP
 static fsh_handle_t	*fsh_basedir = NULL;
 static fsh_handle_t	*fsh_gamedir = NULL;
+static int		fsh_generation;		// P5Ram_Generation() the tables were built in
+
+/*
+================
+FS_PSPCreateHelpers
+
+the file tables: every file of the game folders, so a lookup needs no
+memory stick access. They live in volatile memory (P5Ram)
+================
+*/
+static void FS_PSPCreateHelpers( void )
+{
+	fsh_generation = P5Ram_Generation();
+
+	fsh_basedir = FSH_Create( fs_basedir, 5000 );
+	if( !fsh_basedir )
+		Con_Reportf( "FS_Init: FS Helper error (fsh_basedir)\n" );
+
+	if( Q_stricmp( fs_basedir, fs_gamedir ))
+	{
+		fsh_gamedir = FSH_Create( fs_gamedir, 5000 );
+		if( !fsh_gamedir )
+			Con_Reportf( "FS_Init: FS Helper error (fsh_gamedir)\n" );
+	}
+	else fsh_gamedir = NULL;
+}
+
+/*
+================
+FS_PSPCheckHelpers
+
+sleep mode takes the volatile memory back, the tables with it: after a
+resume, scan the folders again. Until then (and if that fails) the lookups
+go to the memory stick, as with no tables
+================
+*/
+static void FS_PSPCheckHelpers( void )
+{
+	double	start;
+
+	if( fsh_generation == P5Ram_Generation( ))
+		return;
+
+	// the old tables are gone, never free or read them
+	fsh_basedir = fsh_gamedir = NULL;
+
+	if( !P5Ram_IsReady( ))
+		return; // still resuming, try on the next lookup
+
+	start = Sys_DoubleTime();
+	FS_PSPCreateHelpers();
+	Con_Printf( "S_PSP: back from sleep, file tables rebuilt in %i ms\n", (int)(( Sys_DoubleTime() - start ) * 1000.0 ));
+}
 #endif
 
 #ifdef XASH_REDUCE_FD
@@ -2369,17 +2422,7 @@ void FS_Init( void )
 
 	stringlistfreecontents( &dirs );
 #if XASH_PSP
-	fsh_basedir = FSH_Create( fs_basedir, 5000 );
-	if( !fsh_basedir )
-		Con_Reportf( "FS_Init: FS Helper error (fsh_basedir)\n" );
-
-	if( Q_stricmp( fs_basedir, fs_gamedir ))
-	{
-		fsh_gamedir = FSH_Create( fs_gamedir, 5000 );
-		if( !fsh_gamedir )
-			Con_Reportf( "FS_Init: FS Helper error (fsh_gamedir)\n" );
-	}
-	else fsh_gamedir = NULL;
+	FS_PSPCreateHelpers();
 #endif
 	Con_Reportf( "FS_Init: done\n" );
 }
@@ -2407,6 +2450,10 @@ void FS_Shutdown( void )
 	FS_ClearSearchPath(); // release all wad files too
 	Mem_FreePool( &fs_mempool );
 #if XASH_PSP
+	// tables from before a sleep are already gone
+	if( fsh_generation != P5Ram_Generation( ))
+		fsh_basedir = fsh_gamedir = NULL;
+
 	if( fsh_basedir )
 		FSH_Free( fsh_basedir );
 	fsh_basedir = NULL;
@@ -2567,6 +2614,7 @@ static file_t *FS_SysOpen( const char *filepath, const char *mode )
 		FS_BackupFileName( file, filepath, mod|opt );
 		if( mod == PSP_O_WRONLY || mod == PSP_O_RDWR )
 		{
+			FS_PSPCheckHelpers();
 			if( FSH_AddFilePath( fsh_basedir, filepath ) == -2 )
 				FSH_AddFilePath( fsh_gamedir, filepath );
 		}
@@ -2737,6 +2785,7 @@ qboolean FS_SysFileExists( const char *path, qboolean caseinsensitive )
 	int		result;
 	SceIoStat	buf;
 
+	FS_PSPCheckHelpers();
 	result = FSH_Find( fsh_basedir, path );
 	if( result == -2 )
 		result = FSH_Find( fsh_gamedir, path );
@@ -3796,6 +3845,7 @@ fs_offset_t FS_FileSize( const char *filename, qboolean gamedironly )
 #if XASH_PSP
 	char	buffer[64];
 
+	FS_PSPCheckHelpers();
 	Q_sprintf( buffer, "%s/%s", fs_basedir, filename );
 	length = FSH_FindSize( fsh_basedir, buffer );
 	if( length < 0 && length != -3 )
@@ -3909,6 +3959,7 @@ qboolean FS_Rename( const char *oldname, const char *newname )
 	iRet = sceIoRename( oldpath, newpath );
 	if( !iRet )
 	{
+		FS_PSPCheckHelpers();
 		if( FSH_RenameFilePath( fsh_basedir, oldpath, newpath ) == -2 )
 			FSH_RenameFilePath( fsh_gamedir, oldpath, newpath );
 	}
@@ -3941,6 +3992,7 @@ qboolean GAME_EXPORT FS_Delete( const char *path )
 	iRet = sceIoRemove( real_path );
 	if( !iRet )
 	{
+		FS_PSPCheckHelpers();
 		if( FSH_RemoveFilePath( fsh_basedir, real_path ) == -2 )
 			FSH_RemoveFilePath( fsh_gamedir, real_path );
 	}

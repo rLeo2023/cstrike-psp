@@ -83,7 +83,16 @@ typedef struct
 
 } ENTITYPVSSTATUS;
 
+#ifdef __PSP__
+// the PSP menu allows 16 players (15 bots) and max_edicts is 600 there by
+// default: 32 x 1380 made g_PVSStatus 175 KB. Indices past these count as
+// "not in the PVS recently" (client.cpp)
+const int MAX_PVS_CLIENTS = 17;
+const int MAX_ENTITIES = 900;
+#else
+const int MAX_PVS_CLIENTS = MAX_CLIENTS;
 const int MAX_ENTITIES = 1380;
+#endif
 struct PLAYERPVSSTATUS
 {
 	ENTITYPVSSTATUS m_Status[MAX_ENTITIES];

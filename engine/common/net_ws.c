@@ -112,11 +112,26 @@ typedef int WSAsize_t;
 #define SPLITPACKET_MAX_SIZE			64000
 #define NET_MAX_FRAGMENTS		( NET_MAX_FRAGMENT / (SPLITPACKET_MIN_SIZE - sizeof( SPLITPACKET )) )
 
+#if XASH_PSP
+// the listen server talks to its own client through these: NET_MAX_MESSAGE
+// each made 256 KB, but in game the packets are a few KB. A buffer grows to
+// the message it carries, and one over NET_LOOPBACK_KEEP (connection setup)
+// is freed once read
+#define NET_LOOPBACK_KEEP	8192
+
+typedef struct
+{
+	byte		*data;
+	int		datalen;
+	int		size;
+} net_loopmsg_t;
+#else
 typedef struct
 {
 	byte		data[NET_MAX_MESSAGE];
 	int		datalen;
 } net_loopmsg_t;
+#endif
 
 typedef struct
 {
@@ -756,6 +771,15 @@ static qboolean NET_GetLoopPacket( netsrc_t sock, netadr_t *from, byte *data, si
 	memcpy( data, loop->msgs[i].data, loop->msgs[i].datalen );
 	*length = loop->msgs[i].datalen;
 
+#if XASH_PSP
+	if( loop->msgs[i].size > NET_LOOPBACK_KEEP )
+	{
+		free( loop->msgs[i].data );
+		loop->msgs[i].data = NULL;
+		loop->msgs[i].size = 0;
+	}
+#endif
+
 	memset( from, 0, sizeof( *from ));
 	from->type = NA_LOOPBACK;
 
@@ -775,6 +799,23 @@ static void NET_SendLoopPacket( netsrc_t sock, size_t length, const void *data, 
 	loop = &net.loopbacks[sock^1];
 
 	i = loop->send & MASK_LOOPBACK;
+
+#if XASH_PSP
+	if( loop->msgs[i].size < (int)length )
+	{
+		// free first: realloc would copy the old message for nothing
+		free( loop->msgs[i].data );
+		loop->msgs[i].data = malloc( length );
+		loop->msgs[i].size = loop->msgs[i].data ? length : 0;
+
+		if( !loop->msgs[i].data )
+		{
+			Con_Printf( S_ERROR "%s: out of memory for a %i byte packet\n", __func__, (int)length );
+			return; // dropped, like a lost packet
+		}
+	}
+#endif
+
 	loop->send++;
 
 	memcpy( loop->msgs[i].data, data, length );

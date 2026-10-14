@@ -947,6 +947,12 @@ void Host_InitCommon( int argc, char **argv, const char *progname, qboolean bCha
 
 	Con_Init(); // early console running to catch all the messages
 
+#if XASH_PSP
+	{
+		void PSP_BootStep( const char *step );
+		PSP_BootStep( "host init" );
+	}
+#endif
 	Platform_Init();
 
 	baseDir = getenv( "XASH3D_BASEDIR" );
@@ -1000,12 +1006,20 @@ void Host_InitCommon( int argc, char **argv, const char *progname, qboolean bCha
 	else
 		Sys_Error( "Changing working directory to %s failed.\n", host.rootdir );
 
+#if XASH_PSP
+	{
+		void PSP_BootStep( const char *step );
+		PSP_BootStep( va( "working directory %s, opening xash.log", host.rootdir ));
+	}
+#endif
 	Sys_InitLog();
 
 #if XASH_PSP
 	{
 		void PSP_LogMemory( void );
+		void PSP_BootStep( const char *step );
 		PSP_LogMemory();
+		PSP_BootStep( "xash.log open, the rest is there" );
 	}
 #endif
 

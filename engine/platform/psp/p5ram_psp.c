@@ -33,9 +33,14 @@ typedef struct __attribute__(( aligned( 64 ))) p5ram_info_s
 	SceUID			uid;
 	size_t			size;
 	struct p5ram_info_s	*next;
+	int			generation;
 }p5ram_info_t;
 
-static unsigned char	p5ram_flags = 0x00;
+static volatile unsigned char	p5ram_flags = 0x00;
+// sleep mode takes the volatile memory back (P5Ram_PowerCallback frees
+// everything): blocks from before a sleep are gone, the count tells users
+// their data has to be rebuilt
+static volatile int	p5ram_generation = 0;
 static p5ram_info_t	*p5ram_poolchain = NULL;
 static void 		*p5ram_addr;
 static unsigned int	p5ram_size;
@@ -69,6 +74,7 @@ void *P5Ram_Alloc( size_t size, int clear )
 	(( p5ram_info_t* )ptr )->uid  = uid;
 	(( p5ram_info_t* )ptr )->size = size;
 	(( p5ram_info_t* )ptr )->next = p5ram_poolchain;
+	(( p5ram_info_t* )ptr )->generation = p5ram_generation;
 	if( clear ) memset(( unsigned char* )ptr + sizeof( p5ram_info_t ), 0, size );
 
 	p5ram_poolchain = ptr;
@@ -83,6 +89,10 @@ void P5Ram_Free( void *ptr )
 	if( !( p5ram_flags & P5RAM_FLAG_INIT ) || ptr == NULL ) return;
 
 	info = ( p5ram_info_t* )((unsigned char*)ptr - sizeof( p5ram_info_t ));
+
+	// allocated before a sleep: already freed with everything else
+	if( info->generation != p5ram_generation )
+		return;
 
 	if( info == p5ram_poolchain )
 	{
@@ -135,6 +145,9 @@ void P5Ram_PowerCallback( int count, int arg, void *common )
 
 	if ( arg & PSP_POWER_CB_POWER_SWITCH || arg & PSP_POWER_CB_SUSPENDING )
 	{
+		// both may come for one sleep: count it once
+		if( !( p5ram_flags & P5RAM_FLAG_SUSPENDED ))
+			p5ram_generation++;
 		P5Ram_Shutdown();
 		p5ram_flags |= P5RAM_FLAG_SUSPENDED;
 	}
@@ -146,6 +159,17 @@ void P5Ram_PowerCallback( int count, int arg, void *common )
 		P5Ram_Init();
 		p5ram_flags &= ~P5RAM_FLAG_SUSPENDED;
 	}
+}
+
+int P5Ram_Generation( void )
+{
+	return p5ram_generation;
+}
+
+// false from a sleep until the resume is complete
+int P5Ram_IsReady( void )
+{
+	return ( p5ram_flags & P5RAM_FLAG_INIT ) && !( p5ram_flags & P5RAM_FLAG_SUSPENDED );
 }
 
 #ifdef P5RAM_DEBUG

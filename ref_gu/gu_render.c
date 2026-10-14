@@ -14,6 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 */
 #include "gu_local.h"
+#include <malloc.h> // memalign
 
 cvar_t	*gl_texture_lodfunc;
 cvar_t	*gl_texture_lodbias;
@@ -85,11 +86,50 @@ gurender_t	guRender;
 #endif
 
 // a frame's display list measured ~400 KB with 9 bots but 539 KB with 15
-// (11 players in view), so it stays at 1 MB. "r_psp_report" logs the
-// biggest one; R_DrawStudioModel stops adding models when it nears full
-#define PSP_GU_LIST_SIZE	0x100000 // 1 MB
+// (11 players in view), so it is 1 MB. "r_psp_report" logs the biggest one;
+// R_DrawStudioModel stops adding models when it nears full.
+// It goes outside the heap when there is room there (64 MB models keep ~5 MB
+// unused beside the 40 MB heap), else into the heap at half size: without
+// extra memory (PSP-1000) the heap is all there is, and there are no bots
+#define PSP_GU_LIST_SIZE		0x100000 // 1 MB
+#define PSP_GU_LIST_SIZE_SMALL		0x80000	 // 512 KB
+#define PSP_GU_LIST_OUTSIDE_LEFT	0x100000 // kept free outside the heap (ad-hoc modules take 176 KB)
 
-static byte context_list[PSP_GU_LIST_SIZE] __attribute__( ( aligned( 64 ) ) );
+static SceUID	context_list_uid = -1;
+
+static void GU_AllocList( void )
+{
+	if( sceKernelMaxFreeMemSize() >= PSP_GU_LIST_SIZE + PSP_GU_LIST_OUTSIDE_LEFT )
+	{
+		context_list_uid = sceKernelAllocPartitionMemory( 2, "gu_list", PSP_SMEM_High, PSP_GU_LIST_SIZE, NULL );
+		if( context_list_uid > 0 )
+		{
+			// partition blocks are 256 byte aligned
+			guRender.context_list = sceKernelGetBlockHeadAddr( context_list_uid );
+			guRender.context_list_size = PSP_GU_LIST_SIZE;
+			gEngfuncs.Con_Printf( "S_PSP: display list %i KB, outside the heap\n", PSP_GU_LIST_SIZE / 1024 );
+			return;
+		}
+	}
+
+	context_list_uid = -1;
+	guRender.context_list = memalign( 64, PSP_GU_LIST_SIZE_SMALL );
+	if( !guRender.context_list )
+		gEngfuncs.Host_Error( "Memory allocation failled! (guRender.context_list)\n" );
+	guRender.context_list_size = PSP_GU_LIST_SIZE_SMALL;
+	gEngfuncs.Con_Printf( "S_PSP: display list %i KB, in the heap\n", PSP_GU_LIST_SIZE_SMALL / 1024 );
+}
+
+static void GU_FreeList( void )
+{
+	if( context_list_uid > 0 )
+		sceKernelFreePartitionMemory( context_list_uid );
+	else if( guRender.context_list )
+		free( guRender.context_list );
+
+	context_list_uid = -1;
+	guRender.context_list = NULL;
+}
 
 /*
 ===============
@@ -121,8 +161,7 @@ static void GU_Init( void )
 	if( !guRender.depth_buffer )
 		gEngfuncs.Host_Error( "Memory allocation failled! (guRender.depth_buffer)\n" );
 
-	guRender.context_list = context_list;
-	guRender.context_list_size = sizeof( context_list );
+	GU_AllocList();
 
 	// Initialise the GU.
 	sceGuInit();
@@ -226,6 +265,8 @@ static void GU_Shutdown( void )
 	guRender.draw_buffer = NULL;
 	guRender.disp_buffer = NULL;
 	guRender.depth_buffer = NULL;
+
+	GU_FreeList();
 }
 
 /*

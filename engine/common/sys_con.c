@@ -125,6 +125,10 @@ void Sys_InitLog( void )
 		fprintf( s_ld.logfile, "\t%s (build %i) started at %s\n", s_ld.title, Q_buildnum(), Q_timestamp( TIME_FULL ));
 		fprintf( s_ld.logfile, "=================================================================================\n" );
 		fflush( s_ld.logfile );
+#if XASH_PSP
+		fclose( s_ld.logfile ); // see Sys_PrintLog
+		s_ld.logfile = fopen( s_ld.log_path, "a" );
+#endif
 
 		// echo to stdout too, the emulator log window is the only place we
 		// can see this if the file itself is not working out
@@ -248,6 +252,13 @@ void Sys_PrintLog( const char *pMsg )
 
 	fprintf( s_ld.logfile, "%s %s", logtime, pMsg );
 	fflush( s_ld.logfile );
+#if XASH_PSP
+	// a crash powers a real PSP off, and the memory stick keeps the size an
+	// open file had when it was opened: closed after every line, the log
+	// survives up to the last one
+	fclose( s_ld.logfile );
+	s_ld.logfile = fopen( s_ld.log_path, "a" );
+#endif
 }
 
 /*

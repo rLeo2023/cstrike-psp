@@ -274,12 +274,19 @@ int PSP_NetSendTo( int s, const void *buf, int len, const struct sockaddr *to )
 
 static void Adhoc_DropDatagram( int pdp, int error )
 {
-	static byte	junk[0x10000];
 	static int	logged;
 	unsigned short	port;
 	byte		mac[6];
-	int		size = sizeof( junk );
-	int		ret = sceNetAdhocPdpRecv( pdp, mac, &port, junk, &size, 0, 1 );
+	int		size = 0x10000;
+	// rare, so taken only while needed instead of a static 64 KB
+	byte		*junk = malloc( size );
+	int		ret;
+
+	if( !junk )
+		return; // tried again on the next receive
+
+	ret = sceNetAdhocPdpRecv( pdp, mac, &port, junk, &size, 0, 1 );
+	free( junk );
 
 	if( logged++ < 8 )
 		Con_Printf( "S_PSP: adhoc receive error 0x%08x, dropped %i bytes (0x%08x)\n", error, ret >= 0 ? size : 0, ret );

@@ -486,35 +486,82 @@ void PSP_LogHeapUsage( const char *when )
 		(int)(( mi.usmblks > mi.arena ? mi.usmblks : mi.arena ) / 1024 ), sce_newlib_heap_kb_size ));
 }
 
+/*
+================
+PSP_BootStep
+
+startup steps before xash.log exists, into xash_boot.txt. Opened and closed
+for every line: on a real PSP a crash powers it off, and a file left open
+keeps the size it had when it was opened (empty)
+================
+*/
+void PSP_BootStep( const char *step )
+{
+	static qboolean	started;
+	FILE		*f = fopen( "xash_boot.txt", started ? "a" : "w" );
+
+	started = true;
+	if( !f )
+		return;
+
+	fprintf( f, "%s\n", step );
+	fclose( f );
+}
+
+/*
+================
+PSP_EarlyStart
+
+runs before every C++ constructor (priority 101 is the first one), right
+after libc set up the heap. The FPU traps a division by zero or an invalid
+operation on a real PSP (PPSSPP doesn't): Platform_Init turned that off,
+but the constructors of the client and the game library ran before it.
+The boot step tells a crash in there from one before any code ran
+================
+*/
+__attribute__(( constructor( 101 ))) static void PSP_EarlyStart( void )
+{
+	pspSdkDisableFPUExceptions();
+	PSP_BootStep( va( "module started: heap %d KB", sce_newlib_heap_kb_size ));
+}
+
 void Platform_Init( void )
 {
 	SceUID	kamID;
 	int	result;
+
+	PSP_BootStep( va( "platform init: heap %d KB, largest free block was %d KB, outside heap free %d KB",
+		sce_newlib_heap_kb_size, heap_maxfree_kb, (int)( sceKernelTotalFreeMemSize() / 1024 )));
 
 	// disable fpu exceptions (division by zero and etc...)
 	pspSdkDisableFPUExceptions();
 
 	// exit callback thread
 	Platform_SetupCallbacks();
+	PSP_BootStep( "callbacks" );
 
 	// set max cpu/gpu frequency
 	scePowerSetClockFrequency( 333, 333, 166 );
+	PSP_BootStep( "clock 333 MHz" );
 
 	// set max VRAM
 	kamID = Platform_LoadModule( "ka.prx", 1, 0, NULL );
+	PSP_BootStep( va( "ka.prx: 0x%08x", kamID ));
 	if( kamID >= 0 )
 	{
 		result = kaGeEdramGetHwSize();
 		if( result > 0 )
 			result = kaGeEdramSetSize( result );
 		Platform_UnloadModule( kamID, &result );
+		PSP_BootStep( "VRAM size set" );
 	}
 
 	Platform_InitAudioLibs();
+	PSP_BootStep( va( "audio modules: %s", psp_audiolib_init ? "ok" : "failed" ));
 
 	// P5 Ram init
-	P5Ram_Init();
-
+	result = P5Ram_Init();
+	PSP_BootStep( va( "volatile memory: 0x%08x", result ));
 }
 
 void Platform_Shutdown( void )

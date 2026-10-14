@@ -27,7 +27,11 @@ GNU General Public License for more details.
 
 #define CCHANVOLUMES	2
 
+#if XASH_PSP
+#define SND_SCALE_BITS	6	// 64 volume steps for 8 bit sounds (Quake had 32), the table is 64 KB smaller
+#else
 #define SND_SCALE_BITS	7
+#endif
 #define SND_SCALE_SHIFT	(8 - SND_SCALE_BITS)
 #define SND_SCALE_LEVELS	(1 << SND_SCALE_BITS)
 

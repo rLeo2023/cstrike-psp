@@ -194,6 +194,10 @@ static qboolean Mod_KeepBetweenMaps( const model_t *mod )
 }
 #endif
 
+#if XASH_PSP
+static void Mod_PSPReleaseVolatile( void );
+#endif
+
 void Mod_FreeAll( void )
 {
 	int	i;
@@ -202,6 +206,8 @@ void Mod_FreeAll( void )
 	Mod_ReleaseHullPolygons();
 #endif
 #if XASH_PSP
+	Mod_PSPReleaseVolatile();
+
 	// what a level change does (Mod_PurgeStudioCache): the kept models are
 	// unreferenced until the next map precaches them, Mod_FreeUnused drops
 	// the ones it doesn't. Everything else goes now.
@@ -309,6 +315,86 @@ model_t *Mod_FindName( const char *filename, qboolean trackCRC )
 	return mod;
 }
 
+#if XASH_PSP
+#include <psppower.h>
+
+// A model file is read whole and freed once loaded (the loaders copy what
+// they keep): a player model is 2.3 MB, dust2 2 MB, and without extra memory
+// (PSP-1000) the heap can't spare that. The volatile memory has ~3 MB free:
+// big files go there when they fit, leaving room for the renderer's
+// temporary texture buffers (up to 512 KB, also volatile memory). Sleep mode
+// takes that memory back, so it is held off while loading.
+#define MOD_VOLATILE_MIN	( 256 * 1024 )
+#define MOD_VOLATILE_LEAVE	( 512 * 1024 )
+
+static byte	*mod_volatile_buf;	// the file being loaded, if in volatile memory
+
+static void Mod_PSPFreeFile( byte *buf, qboolean isvolatile );
+
+static byte *Mod_PSPLoadFile( const char *path, fs_offset_t *length, qboolean *isvolatile )
+{
+	file_t		*f;
+	fs_offset_t	size;
+	byte		*buf, *probe;
+
+	*isvolatile = false;
+
+	f = FS_Open( path, "rb", false );
+	if( !f )
+		return NULL;
+
+	size = FS_FileLength( f );
+
+	// one file at a time there: one loaded from inside another load (or
+	// after a Host_Error skipped the free) uses the heap
+	if( !mod_volatile_buf && size >= MOD_VOLATILE_MIN && ( probe = P5Ram_Alloc( size + 1 + MOD_VOLATILE_LEAVE, 0 )) != NULL )
+	{
+		P5Ram_Free( probe );
+		scePowerLock( 0 );
+
+		buf = P5Ram_Alloc( size + 1, 0 );
+		if( buf && FS_Read( f, buf, size ) == size )
+		{
+			buf[size] = '\0';
+			FS_Close( f );
+			*length = size;
+			*isvolatile = true;
+			mod_volatile_buf = buf;
+			Con_Printf( "S_PSP: %s read into volatile memory (%i KB)\n", path, (int)( size / 1024 ));
+			return buf;
+		}
+
+		if( buf )
+			P5Ram_Free( buf );
+		scePowerUnlock( 0 );
+	}
+
+	FS_Close( f );
+	return FS_LoadFile( path, length, false );
+}
+
+static void Mod_PSPFreeFile( byte *buf, qboolean isvolatile )
+{
+	if( !isvolatile )
+	{
+		Mem_Free( buf );
+		return;
+	}
+
+	P5Ram_Free( buf );
+	mod_volatile_buf = NULL;
+	scePowerUnlock( 0 );
+}
+
+// a Host_Error inside a loader skipped the free: let go of that file and of
+// the sleep lock (called with no load running)
+static void Mod_PSPReleaseVolatile( void )
+{
+	if( mod_volatile_buf )
+		Mod_PSPFreeFile( mod_volatile_buf, true );
+}
+#endif
+
 /*
 ==================
 Mod_LoadModel
@@ -323,6 +409,12 @@ model_t *Mod_LoadModel( model_t *mod, qboolean crash )
 	qboolean		loaded;
 	byte		*buf;
 	model_info_t	*p;
+#if XASH_PSP
+	qboolean		isvolatile;
+#define Mod_FreeFile( b )	Mod_PSPFreeFile( b, isvolatile )
+#else
+#define Mod_FreeFile( b )	Mem_Free( b )
+#endif
 
 	ASSERT( mod != NULL );
 
@@ -339,7 +431,11 @@ model_t *Mod_LoadModel( model_t *mod, qboolean crash )
 	Q_strncpy( tempname, mod->name, sizeof( tempname ));
 	COM_FixSlashes( tempname );
 
+#if XASH_PSP
+	buf = Mod_PSPLoadFile( tempname, &length, &isvolatile );
+#else
 	buf = FS_LoadFile( tempname, &length, false );
+#endif
 
 	if( !buf )
 	{
@@ -376,7 +472,7 @@ model_t *Mod_LoadModel( model_t *mod, qboolean crash )
 		// ref.dllFuncs.Mod_LoadModel( mod_brush, mod, buf, &loaded, 0 );
 		break;
 	default:
-		Mem_Free( buf );
+		Mod_FreeFile( buf );
 		if( crash ) Host_Error( "%s has unknown format\n", tempname );
 		else Con_Printf( S_ERROR "%s has unknown format\n", tempname );
 		return NULL;
@@ -405,7 +501,7 @@ model_t *Mod_LoadModel( model_t *mod, qboolean crash )
 	if( !loaded )
 	{
 		Mod_FreeModel( mod );
-		Mem_Free( buf );
+		Mod_FreeFile( buf );
 
 		if( crash ) Host_Error( "Could not load model %s\n", tempname );
 		else Con_Printf( S_ERROR "Could not load model %s\n", tempname );
@@ -435,7 +531,8 @@ model_t *Mod_LoadModel( model_t *mod, qboolean crash )
 			p->initialCRC = currentCRC;
 		}
 	}
-	Mem_Free( buf );
+	Mod_FreeFile( buf );
+#undef Mod_FreeFile
 
 	return mod;
 }

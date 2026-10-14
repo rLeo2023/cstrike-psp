@@ -545,7 +545,11 @@ typedef struct
 #define MAX_MOVIES		8
 #define MAX_CDTRACKS	32
 #define MAX_CLIENT_SPRITES	256	// SpriteTextures
+#ifdef __PSP__
+#define MAX_EFRAGS		4096	// CS maps have few static entities, half saves 64 KB
+#else
 #define MAX_EFRAGS		8192	// Arcane Dimensions required
+#endif
 #define MAX_REQUESTS	64
 
 

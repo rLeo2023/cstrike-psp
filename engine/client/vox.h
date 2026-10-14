@@ -16,7 +16,14 @@ GNU General Public License for more details.
 #ifndef VOX_H
 #define VOX_H
 
+#if XASH_PSP
+// every sound channel keeps this many words (36 bytes each): 64 made the
+// channels 2.3 KB each, 350 KB in all. CS sentences have at most 9 words,
+// Half-Life's 29
+#define CVOXWORDMAX			32
+#else
 #define CVOXWORDMAX			64
+#endif
 #define CVOXZEROSCANMAX		255	// scan up to this many samples for next zero crossing
 #if XASH_PSP
 #define MAX_SENTENCES		2048

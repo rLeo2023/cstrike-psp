@@ -863,6 +863,39 @@ static void GL_TextureSwizzle( byte *dst, const byte *src, uint width, uint heig
 
 /*
 ===============
+GL_TempAlloc
+
+temporary upload buffer: volatile memory, or the heap when that is full
+(a model file being loaded may be there too, see Mod_PSPLoadFile)
+===============
+*/
+static qboolean	gl_temp_in_heap;
+
+static byte *GL_TempAlloc( size_t size )
+{
+	byte	*buf = gEngfuncs.P5Ram_Alloc( size, 0 );
+
+	gl_temp_in_heap = false;
+
+	if( !buf )
+	{
+		buf = memalign( 64, size );
+		gl_temp_in_heap = true;
+	}
+
+	if( !buf ) gEngfuncs.Host_Error( "GL_UploadTexture: temporary memory error\n" );
+
+	return buf;
+}
+
+static void GL_TempFree( byte *buf )
+{
+	if( gl_temp_in_heap ) free( buf );
+	else gEngfuncs.P5Ram_Free( buf );
+}
+
+/*
+===============
 GL_UploadTexture
 
 upload texture into memory
@@ -963,10 +996,7 @@ static qboolean GL_UploadTexture( gl_texture_t *tex, rgbdata_t *pic )
 
 		// Volatile memory for temporary buffer
 		if( swizzle )
-		{
-			tempBuff = gEngfuncs.P5Ram_Alloc( texSize, 0 );
-			if( !tempBuff ) gEngfuncs.Host_Error( "GL_UploadTexture: temporary memory error\n" );
-		}
+			tempBuff = GL_TempAlloc( texSize );
 
 		// Load base + mip texture
 		for( i = 0; i < tex->numMips; i++ )
@@ -984,17 +1014,14 @@ static qboolean GL_UploadTexture( gl_texture_t *tex, rgbdata_t *pic )
 
 		if( swizzle )
 		{
-			gEngfuncs.P5Ram_Free( tempBuff );
+			GL_TempFree( tempBuff );
 			SetBits( tex->flags, TF_IMG_SWIZZLED );
 		}
 	}
 	else if( pic->type == PF_RGB_5650 || pic->type == PF_RGBA_5551 || pic->type == PF_RGBA_4444 )
 	{
 		if( swizzle )
-		{
-			tempBuff = gEngfuncs.P5Ram_Alloc( texSize, 0 );
-			if( !tempBuff ) gEngfuncs.Host_Error( "GL_UploadTexture: temporary memory error\n" );
-		}
+			tempBuff = GL_TempAlloc( texSize );
 
 		if(( pic->width != tex->width ) || ( pic->height != tex->height ))
 		{
@@ -1009,7 +1036,7 @@ static qboolean GL_UploadTexture( gl_texture_t *tex, rgbdata_t *pic )
 		if( swizzle )
 		{
 			GL_TextureSwizzle( tex->dstTexture, tempBuff, tex->width * tex->bpp, tex->height );
-			gEngfuncs.P5Ram_Free( tempBuff );
+			GL_TempFree( tempBuff );
 			SetBits( tex->flags, TF_IMG_SWIZZLED );
 		}
 	}
@@ -1018,8 +1045,7 @@ static qboolean GL_UploadTexture( gl_texture_t *tex, rgbdata_t *pic )
 		if(( pic->width != tex->width ) || ( pic->height != tex->height ))
 			offset = tex->width * tex->height * 4; // src size
 
-		tempBuff = gEngfuncs.P5Ram_Alloc( swizzle ? ( texSize + offset ) : texSize, 0 );
-		if( !tempBuff ) gEngfuncs.Host_Error( "GL_UploadTexture: temporary memory error\n" );
+		tempBuff = GL_TempAlloc( swizzle ? ( texSize + offset ) : texSize );
 
 		if(( pic->width != tex->width ) || ( pic->height != tex->height ))
 			GL_ResampleTexture32( pic->buffer, pic->width, pic->height, tempBuff, tex->width, tex->height, normalMap );
@@ -1048,7 +1074,7 @@ static qboolean GL_UploadTexture( gl_texture_t *tex, rgbdata_t *pic )
 				SetBits( tex->flags, TF_IMG_SWIZZLED );
 			}
 		}
-		gEngfuncs.P5Ram_Free( tempBuff );
+		GL_TempFree( tempBuff );
 	}
 
 	sceKernelDcacheWritebackRange( tex->dstTexture, texSize );

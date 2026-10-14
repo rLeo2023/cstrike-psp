@@ -142,7 +142,8 @@ char **VOX_ParseString( char *psz )
 	i = 0;
 	rgpparseword[i++] = psz;
 
-	while( !fdone && i < CVOXWORDMAX )
+	// the last slot stays NULL: callers walk the list until a NULL word
+	while( !fdone && i < CVOXWORDMAX - 1 )
 	{
 		// scan up to next word
 		c = *p;
@@ -170,7 +171,7 @@ char **VOX_ParseString( char *psz )
 				if( c == '.' ) rgpparseword[i++] = voxperiod;
 				else rgpparseword[i++] = voxcomma;
 
-				if( i >= CVOXWORDMAX )
+				if( i >= CVOXWORDMAX - 1 )
 					break;
 			}
 

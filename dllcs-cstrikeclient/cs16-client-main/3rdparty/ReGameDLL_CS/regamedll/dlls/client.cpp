@@ -136,7 +136,7 @@ static entity_field_alias_t custom_entity_field_alias[] =
 edict_t *g_pEdicts = nullptr;
 bool g_bServerActive = false;
 bool g_bItemCreatedByBuying = false;
-PLAYERPVSSTATUS g_PVSStatus[MAX_CLIENTS];
+PLAYERPVSSTATUS g_PVSStatus[MAX_PVS_CLIENTS];
 unsigned short m_usResetDecals;
 unsigned short g_iShadowSprite;
 
@@ -4457,6 +4457,9 @@ void EXT_FUNC SetupVisibility(edict_t *pViewEntity, edict_t *pClient, unsigned c
 
 void ResetPlayerPVS(edict_t *client, int clientnum)
 {
+	if (clientnum < 0 || clientnum >= MAX_PVS_CLIENTS)
+		return;
+
 	PLAYERPVSSTATUS *pvs = &g_PVSStatus[clientnum];
 
 	Q_memset(pvs, 0, sizeof(*pvs));
@@ -4467,6 +4470,9 @@ void ResetPlayerPVS(edict_t *client, int clientnum)
 
 bool CheckPlayerPVSLeafChanged(edict_t *client, int clientnum)
 {
+	if (clientnum < 0 || clientnum >= MAX_PVS_CLIENTS)
+		return false;
+
 	PLAYERPVSSTATUS *pvs = &g_PVSStatus[clientnum];
 	if (pvs->headnode != client->headnode || pvs->num_leafs != client->num_leafs)
 		return true;
@@ -4485,6 +4491,9 @@ void MarkEntityInPVS(int clientnum, int entitynum, float time, bool inpvs)
 	PLAYERPVSSTATUS *pvs;
 	ENTITYPVSSTATUS *es;
 
+	if (clientnum < 0 || clientnum >= MAX_PVS_CLIENTS || entitynum < 0 || entitynum >= MAX_ENTITIES)
+		return;
+
 	pvs = &g_PVSStatus[clientnum];
 	es = &pvs->m_Status[entitynum];
 
@@ -4498,6 +4507,9 @@ bool CheckEntityRecentlyInPVS(int clientnum, int entitynum, float currenttime)
 {
 	PLAYERPVSSTATUS *pvs;
 	ENTITYPVSSTATUS *es;
+
+	if (clientnum < 0 || clientnum >= MAX_PVS_CLIENTS || entitynum < 0 || entitynum >= MAX_ENTITIES)
+		return false;
 
 	pvs = &g_PVSStatus[clientnum];
 	es = &pvs->m_Status[entitynum];

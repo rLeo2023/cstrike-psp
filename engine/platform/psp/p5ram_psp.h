@@ -27,6 +27,8 @@ void P5Ram_Free( void *ptr );
 void P5Ram_FreeAll( void );
 void P5Ram_Shutdown( void );
 void P5Ram_PowerCallback( int count, int arg, void *common );
+int P5Ram_Generation( void );
+int P5Ram_IsReady( void );
 #ifdef P5RAM_DEBUG
 void P5Ram_Print( void );
 #endif
